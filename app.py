@@ -2151,10 +2151,36 @@ class App(tk.Tk):
         self.btn_ejecutar = Boton(pie, h["titulo"], self.procesar, grande=True)
         self.btn_ejecutar.pack(side="right")
         self.btn_abrir = Boton(pie, "Abrir carpeta", self.abrir_destino, tipo="secundario")
-        self.estado = tk.Label(pie, text="", bg=FONDO, fg=TEXTO_SUAVE, font=fuente(10), anchor="w")
+        self._apoyo(pie)
+        self.estado = tk.Label(pie, text="", bg=FONDO, fg=TEXTO_SUAVE, font=fuente(10), anchor="w",
+                               justify="left", wraplength=px(330), width=1)
         self.estado.pack(side="left", fill="x", expand=True)
+        # el resultado usa el ancho que quede libre y baja de renglón si no entra
+        self.estado.bind("<Configure>", lambda e: e.widget.configure(wraplength=max(px(80), e.width - px(4))))
         self.progreso = ttk.Progressbar(pie, mode="indeterminate", length=px(150), style="Fina.Horizontal.TProgressbar")
         self._preparar_soltar()
+
+    def _apoyo(self, pie):
+        """Bloque chico de donaciones abajo a la izquierda (Cafecito y GitHub Sponsors).
+        Solo abre la página en el navegador: el programa en sí no se conecta a internet."""
+        caja = tk.Frame(pie, bg=FONDO)
+        caja.pack(side="left", padx=(0, px(16)))
+        tk.Label(caja, text="¿Te sirvió? Apoyá a Pache Labs", bg=FONDO, fg=TEXTO_SUAVE,
+                 font=fuente(9), anchor="w").pack(anchor="w")
+        enlaces = tk.Frame(caja, bg=FONDO)
+        enlaces.pack(anchor="w", pady=(px(2), 0))
+        opciones = [("☕ Cafecito", "https://cafecito.app/pachelabs"),          # Argentina (Mercado Pago)
+                    ("♥ GitHub Sponsors", "https://github.com/sponsors/pachelabs-apps")]  # exterior
+        for i, (texto, url) in enumerate(opciones):
+            if i:
+                tk.Label(enlaces, text="·", bg=FONDO, fg=TEXTO_SUAVE, font=fuente(10, True)).pack(side="left", padx=px(6))
+            enl = tk.Label(enlaces, text=texto, bg=FONDO, fg=ROJO, font=fuente(10, True), cursor="hand2")
+            enl.pack(side="left")
+            enl.bind("<Button-1>", lambda e, u=url: abrir_archivo(u))
+            enl.bind("<Enter>", lambda e, w=enl: w.configure(font=(FUENTE, 10, "bold underline")))
+            enl.bind("<Leave>", lambda e, w=enl: w.configure(font=fuente(10, True)))
+        # separador fino entre las donaciones y el resultado
+        tk.Frame(pie, bg=BORDE, width=1).pack(side="left", fill="y", padx=(0, px(14)), pady=px(4))
 
     def _rueda(self, lienzo):
         def mover(e):
@@ -2918,7 +2944,7 @@ class App(tk.Tk):
         self.btn_abrir.pack_forget()
         if si:
             self.estado.configure(text="Procesando…", fg=TEXTO_SUAVE)
-            self.progreso.pack(side="right", padx=px(14))
+            self.progreso.pack(side="right", padx=px(14), before=self.estado)
             self.progreso.start(12)
         else:
             self.progreso.stop()
@@ -2937,7 +2963,7 @@ class App(tk.Tk):
         if ok:
             self.ultimo_destino = destino
             self.estado.configure(text=f"✔  {msg}", fg=OK)
-            self.btn_abrir.pack(side="right", padx=(0, px(10)))
+            self.btn_abrir.pack(side="right", padx=(0, px(10)), before=self.estado)
             extra = []
             if self.pref_limpiar and self.archivos:
                 self.archivos = []
