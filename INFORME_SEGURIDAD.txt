@@ -1,0 +1,342 @@
+Ozone PDF 1.1.0 - Informe de seguridad
+=======================================
+Fecha de revisión: 24/10/2026 (incluye las correcciones de varias revisiones técnicas del código)
+
+RESUMEN
+-------
+Ozone PDF procesa los documentos en la propia computadora. El código no tiene
+ninguna función de red: no envía, no sube ni descarga nada, y no tiene
+telemetría. La garantía se apoya en tres capas: revisión del código, exclusión
+de los módulos de red en el ejecutable y una regla de firewall que el propio
+instalador crea.
+
+
+1. USO DE RED
+-------------
+Verificado sobre la versión 1.1.0 (en Linux, sobre el código fuente y sobre el
+ejecutable armado con PyInstaller; en Windows, ver "Pendiente en Windows"):
+- Revisión del código: no hay ninguna instrucción de red.
+- Las 15 herramientas funcionan con la red desconectada por completo.
+- Monitoreo de llamadas al sistema operativo durante el uso: 0 conexiones.
+- Con todos los módulos de red de Python bloqueados, la app funciona igual.
+
+Exclusiones en el ejecutable (CREAR_INSTALADOR.bat):
+- Siempre: HTTP, HTTPS/SSL, correo (SMTP, POP, IMAP), FTP, XML-RPC y apertura
+  de navegador.
+- Exclusión estricta: además socket, asyncio y multiprocessing. El script
+  arma el programa así y le corre una autoprueba: las 15 herramientas y la
+  verificación de que esos módulos realmente falten. Si falla, la compilación
+  SE DETIENE y pregunta si se quiere armar con la exclusión reducida (sin
+  respuesta en 2 minutos, cancela). El modo usado queda grabado en el programa
+  y se ve en "Acerca de".
+  (Excepción: si el intérprete trae _socket incorporado, no se puede quitar;
+  la autoprueba lo anota. Sin el módulo "socket" de Python igual no se usa.)
+- Se excluye onnxruntime (lo incorpora PyMuPDF 2.x y escribe datos propios).
+  Por eso PyMuPDF queda fijado en la rama 1.x.
+
+Límite de esta garantía: el ejecutable conserva ctypes y el mecanismo de
+Windows para arrastrar y soltar, que en teoría permiten llamar funciones del
+sistema. El código no los usa para red, pero la exclusión de módulos no
+alcanza por sí sola para "probar" la ausencia de red. Por eso el instalador
+crea una regla de firewall de salida que bloquea toda conexión del programa
+("Ozone PDF - sin red") y la borra al desinstalar. Para eso el instalador se
+instala siempre para todos los usuarios en C:\Program Files\Ozone PDF (pide
+permisos de administrador). Si se fuerza /CURRENTUSER, se instala en el perfil
+del usuario y NO se crea la regla (no recomendado).
+
+Cuándo la regla local NO alcanza: si la GPO de firewall del dominio tiene
+"Aplicar reglas de firewall locales: No", o si el firewall de Windows está
+apagado o lo reemplaza otro producto, la regla que crea el instalador no
+tiene efecto. Entonces hay que desplegarla por GPO y verificarla en una PC
+piloto con:
+  Get-NetFirewallRule -DisplayName "Ozone PDF - sin red" -PolicyStore ActiveStore
+
+Regla manual equivalente (por ejemplo, para GPO):
+  New-NetFirewallRule -DisplayName "Ozone PDF - sin red" -Direction Outbound `
+    -Program "C:\Program Files\Ozone PDF\Ozone PDF.exe" -Action Block
+
+OneDrive: Ozone PDF no usa internet, pero si el usuario guarda en una carpeta
+sincronizada con OneDrive (Escritorio o Documentos suelen estarlo), OneDrive
+sube el resultado a la nube. Lo mismo pasa con las bibliotecas de
+SharePoint o Teams sincronizadas. La app detecta esas carpetas (variables de
+OneDrive y rutas que OneDrive registra en el registro local de Windows, sin
+usar la red) y pregunta antes de guardar.
+
+Única descarga, solo al CREAR el instalador (no al usar la app): Python 3.12,
+Inno Setup y los componentes de PyPI, estos últimos verificados por huella
+SHA-256 (requirements.txt con --require-hashes).
+
+
+2. ARCHIVOS - QUÉ ESCRIBE EN LA PC
+----------------------------------
+- Solo escribe en la carpeta y con el nombre que el usuario elige al guardar.
+- No crea caché, historial ni registros. Lo único que guarda son tres
+  preferencias en el registro del usuario (HKCU\Software\Ozone PDF): el tema
+  ("ModoTema": automático, claro u oscuro) y las casillas "Abrir al terminar"
+  y "Limpiar la lista al terminar". No contienen datos de archivos ni de uso.
+  En modo automático lee el modo claro/oscuro de Windows. (La autoprueba usada
+  al compilar escribe en %TEMP%, solo en la PC de compilación.)
+- Nunca modifica el original y no permite guardar con su mismo nombre. La
+  comparación no distingue mayúsculas (Windows) y detecta el mismo archivo
+  aunque se llegue por otra ruta.
+- Escritura segura: el resultado (archivo o carpeta) se escribe primero como
+  ".~nombre.parcial" y recién al terminar bien se renombra al destino. Si
+  algo falla, el parcial se borra. Las carpetas parciales quedan ocultas en
+  Windows mientras se generan.
+- Datos ocultos: TODAS las herramientas aplican la misma limpieza al guardar:
+  quitan autor, título y XMP (también el /Info escrito en el trailer);
+  archivos adjuntos (incrustados y anotaciones de archivo), salvo en "Quitar
+  contraseña", que devuelve el mismo documento con sus adjuntos; el autor y
+  las fechas de cada nota y de sus respuestas; todo el JavaScript (el que se
+  ejecuta al abrir el PDF, el de los enlaces, marcadores, campos, páginas y
+  anotaciones, y las acciones encadenadas);
+  datos privados de programas de edición (PieceInfo) y miniaturas.
+- Imagen a PDF: las fotos se insertan sin EXIF (ubicación GPS, modelo de
+  celular, autor), XMP, IPTC, FlashPix ni comentarios, y sin lo que vaya
+  pegado después del final de la imagen (el video de las "fotos con
+  movimiento"). Los JPG que no hay que girar se insertan sin recomprimir
+  (solo se les quitan esos bloques; se conserva el perfil de color). Se conservan el contenido visible, el texto de
+  las notas y de sus respuestas (Unir y Dividir arman un PDF nuevo y no
+  copian las respuestas; avisan antes), y la capa de texto de los escaneos.
+  Si el PDF tiene adjuntos, la app avisa antes de procesarlo.
+  NO se borran: los valores de los campos de formulario (por ejemplo, un
+  nombre o DNI cargado en un formulario) ni el texto en capas ocultas, porque
+  son contenido del documento. Si no deben viajar, hay que quitarlos en el
+  programa de origen.
+- Durante una operación no se pueden agregar, quitar ni reordenar archivos
+  (así PyMuPDF nunca se usa desde dos hilos a la vez).
+- Las carpetas de salida nunca pisan una existente: "nombre (2)", etc.
+- Comprimir: si el resultado no es más chico que el original, no se genera
+  ningún archivo (se informa en pantalla). Los escaneos en blanco y negro
+  solo se reducen en el nivel Alta, para no perder legibilidad.
+- Si se cierra la ventana durante un proceso, pregunta; al confirmar, el
+  motor se detiene en la página o el archivo que está procesando, descarta el
+  parcial y cierra. La ventana queda visible ("Cancelando…") hasta que el
+  proceso termina de verdad: recomprimir las imágenes (Comprimir) y guardar
+  el archivo final son pasos que MuPDF hace de una vez y no se pueden cortar.
+  Medido: una conversión de 300 páginas a 300 dpi se detuvo en medio segundo.
+
+
+3. CONTRASEÑAS Y PDF PROTEGIDOS
+-------------------------------
+- Proteger PDF: cifrado AES-256 con contraseña de apertura: sin ella nadie
+  ve el contenido. La misma contraseña es la de propietario: quien la tiene
+  usa el PDF completo (imprimir, copiar, editar) y puede quitar la protección
+  con "Quitar contraseña". No se marcan restricciones (con la clave de
+  propietario no tendrían efecto). Esas marcas dependen de que el
+  programa lector las respete y quien tenga la clave de apertura podría
+  quitarlas con otras herramientas: la protección fuerte es la contraseña.
+- Las contraseñas no se guardan en ningún lado; los campos se vacían al
+  terminar. Se advierte si la contraseña tiene menos de 6 caracteres.
+- Quitar contraseña exige siempre la clave correcta:
+  * PDF que pide clave para abrirse: la de apertura o la de propietario.
+  * PDF que abre sin clave pero tiene restricciones (contraseña solo de
+    propietario): exige la de propietario.
+  * Con la clave de apertura (no la de propietario) se quita la contraseña,
+    pero las restricciones que tuviera el PDF se mantienen.
+  (Corrección de la primera revisión: antes un PDF con solo contraseña de
+  propietario se desbloqueaba con cualquier clave.)
+- PDF cifrados que abren sin clave y no restringen nada (muy comunes en
+  bancos, escáneres y sistemas): se procesan como un PDF normal.
+- PDF que piden contraseña para abrirse: solo "Quitar contraseña".
+- PDF con restricciones: "PDF a texto" funciona si permiten copiar y "PDF a
+  imagen" si permiten imprimir; las herramientas que generan otro PDF piden
+  quitar las restricciones primero (hace falta la clave de propietario).
+- El control está en la interfaz y también en el motor (segunda barrera), y
+  el proceso usa una copia de la lista revisada.
+
+
+3b. PDF CON FIRMA DIGITAL
+------------------------
+- La app detecta los PDF con firma digital aplicada (por ejemplo, de GDE o
+  firmados con token) y lo muestra en la lista: "con firma digital" si el
+  archivo no se modificó después de la última firma, o "firma digital NO
+  válida (copia modificada)" si es una copia unida, comprimida, etc. (el
+  sello visible de la firma se sigue viendo, pero la firma ya no vale).
+- Antes de Unir, Dividir, Comprimir, Extraer, Eliminar, Ordenar, Rotar,
+  Numerar, Marca de agua, Proteger o Quitar contraseña avisa: la copia NO va
+  a tener una firma válida (cualquier cambio la invalida; al unir o extraer
+  se pierde) y el documento firmado sigue siendo el original, que no se toca.
+- Verificado con un PDF firmado de prueba: la firma queda inválida tras
+  Rotar, Numerar y Unir, y desaparece tras Extraer (la copia extraída ya no
+  se muestra como firmada). PDF a texto y PDF a
+  imagen no generan un PDF y no avisan.
+
+
+4. COMPONENTES Y VULNERABILIDADES
+---------------------------------
+- Versiones y huellas fijas en requirements.txt: PyMuPDF 1.28.2,
+  Pillow 13.0.0, PyInstaller 6.22.3, tkinterdnd2 0.6.4 y las dependencias de
+  PyInstaller. Se compila siempre con Python 3.12, en un entorno aislado.
+- pip-audit (base de PyPI) al 24/10/2026: sin vulnerabilidades conocidas.
+- IMPORTANTE: pip-audit no cubre las vulnerabilidades de MuPDF, el motor en
+  C que usa PyMuPDF. Hay que seguir los avisos de seguridad de Artifex
+  (MuPDF/PyMuPDF) y actualizar PyMuPDF cuando publiquen correcciones.
+- tkinterdnd2 (arrastrar y soltar) usa el mecanismo local de Windows; se
+  revisó su código y no tiene funciones de red.
+
+
+5. CORRECCIONES DE LAS REVISIONES TÉCNICAS (24/10/2026)
+-------------------------------------------------------
+Revisiones técnicas del código hechas durante el desarrollo.
+Alta:   Quitar contraseña con PDF de propietario; una operación a la vez;
+        Imagen a PDF con WEBP, TIFF de varias páginas y orientación EXIF;
+        protección del original sin distinguir mayúsculas.
+Media:  carpetas parciales; cierre con proceso en curso; marca de agua
+        centrada en páginas rotadas y con fuente TrueType; mensajes claros
+        y validación de campos; comprimir sin generar archivos más grandes;
+        caché de información de los PDF; aviso al descartar páginas al
+        ordenar.
+Compilación: Python 3.12 fijo; entorno aislado; huellas SHA-256; exclusión
+        estricta de red con autoprueba; firma con /sha1 del programa,
+        instalador y desinstalador; licencia AGPL en el instalador y
+        ventana "Acerca de"; permisos reales al proteger.
+Segunda revisión (24/10/2026):
+        Quitar contraseña mantiene restricciones con la clave de apertura;
+        TIFF de 16 bits escalados; regla de firewall automática e instalación
+        para todos los usuarios; plan B que se detiene y modo visible en
+        "Acerca de"; cancelación página por página; doble barrera contra PDF
+        protegidos; metadatos borrados; formato de numeración sin opciones;
+        aviso de OneDrive; límite de memoria en PDF a imagen; marcadores al
+        unir; versión de Python fija en winget.
+Tercera revisión (24/10/2026):
+        limpieza de adjuntos y autores de notas en todas las herramientas;
+        detección de bibliotecas de SharePoint/Teams; verificación de la
+        regla de firewall en dominios; lista bloqueada durante un proceso;
+        contraseña revisada antes de pedir destino; buscador filtrado y
+        errores en español; tope estricto de 40 MP; JPG sin recomprimir;
+        entorno de compilación rehecho si no es Python 3.12; autoprueba que
+        revisa resultados; validación de la huella del certificado;
+        1_probar.bat igual al script principal; carpeta de instalación fija.
+Cambio posterior: se quitó el "saludo del autor" (código de teclas e imagen).
+La app no tiene funciones ocultas ni combinaciones de teclas especiales.
+Cuarta revisión (24/10/2026):
+        PDF cifrados sin restricciones procesados como normales; PDF con
+        restricciones: lectura según el permiso de copiar o imprimir; aviso
+        de firma digital; firma de TODOS los .exe, .dll y .pyd del programa;
+        guía de manejo de la clave de firma (no exportable, token, PFX con
+        contraseña, equipo dedicado); respuestas de notas conservadas (Unir y
+        Dividir avisan que no las copian); fotos MPO (Ultra
+        HDR) en una sola página; cancelación visible; uso con teclado;
+        "Empezar en" desde 1; control de versión de Inno Setup; autoprueba
+        con tiempo límite; explorer.exe con ruta completa; escaneos en blanco
+        y negro sin reducir en Baja y Media; textos completos de las licencias
+        de terceros (LICENCIAS_TERCEROS.txt), incluidas las bibliotecas que
+        MuPDF trae adentro.
+Quinta revisión (24/10/2026):
+        se quitó el script de instalación por GPO (corría como SYSTEM desde
+        una carpeta compartida: riesgo de escalada de privilegios); la
+        instalación es con el instalador en cada PC (o SCCM/Intune). La
+        autoprueba se vuelve a correr sobre el programa ya firmado; un
+        cuelgue de la autoprueba detiene la compilación sin ofrecer la
+        exclusión reducida; el sello de tiempo reintenta con otro servidor;
+        aviso de respuestas a comentarios en Unir y Dividir.
+Revisión técnica independiente (24/10/2026):
+        Imagen a PDF quita EXIF/GPS/XMP de las fotos; limpieza de todo el
+        JavaScript, PieceInfo e /Info del trailer; Quitar contraseña conserva
+        los adjuntos; Proteger usa la misma clave como propietario (antes el
+        PDF quedaba restringido para siempre); Rotar no gira dos veces una
+        página repetida en el rango; Unir descarta marcadores huérfanos con sus
+        hijos; GIF/WEBP animados dan una página; resoluciones irreales y
+        páginas de más de 200 pulgadas corregidas; imágenes sin pérdida
+        insertadas como PNG; acciones de cada fila y "Acerca de" accesibles con
+        teclado; "eliminar todas las páginas" se valida antes de elegir
+        destino; compilación: código de error negativo tratado como falla,
+        tiempo límite externo para la autoprueba, entorno de compilación nuevo
+        en cada compilación, Python de 64 bits obligatorio, solo la versión
+        x64 de tkdnd en el programa; avisos de licencia de los componentes de
+        Python (OpenSSL, libffi, expat, libmpdec) y del runtime de Visual C++.
+Verificación de la revisión independiente (24/10/2026):
+        detección de firma con la lista de campos guardada aparte; fotos sin
+        el video de "foto con movimiento" ni bloques FlashPix; JavaScript
+        también en marcadores y acciones encadenadas; Proteger sin marcas de
+        permisos (no tenían efecto); la lista se desplaza hasta la fila que
+        tiene el foco del teclado; WEBP con pérdida insertado como JPEG (no
+        como PNG, que lo agrandaba); si PowerShell no está disponible, la
+        compilación se detiene con un mensaje propio sin ofrecer la exclusión
+        reducida.
+Prueba en Windows (24/10/2026): la compilación y la autoprueba con exclusión
+        estricta pasaron. Se quitó el control previo de versión de Inno Setup,
+        que leía mal la versión y frenaba la compilación con Inno al día: si
+        Inno es anterior a 6.3, el error de compilación lo indica.
+Versión 1.1.0 (26/10/2026):
+        Dividir PDF por tamaño máximo (MB); modo oscuro (logo blanco sobre
+        negro, barra de título oscura en Windows); casillas "Abrir al terminar" y
+        "Limpiar la lista al terminar" (tildadas la primera vez y recordadas);
+        aviso grande en el centro al terminar; tema automático (sigue a
+        Windows), claro u oscuro, recordado.
+Versión pública "Ozone PDF" (05/11/2026):
+        Software libre bajo GNU AGPL-3.0 (LICENSE.txt), con nombre, logo e
+        ícono propios y colores del logo (rojo y azul). Nueva herramienta
+        "Fotos a PDF": la cámara de la computadora como escáner (OpenCV, se
+        carga solo al abrir la cámara). Modo "Escanear documento" (detecta la
+        hoja, la recorta y corrige la perspectiva) o "Foto normal"; color,
+        escala de grises o documento. Paleta roja y blanca, buscador de
+        herramientas en el menú y aviso final con fondo de color.
+        Las fotos se guardan en una carpeta temporal propia que se borra al
+        cerrar el programa (y, con "Limpiar la lista", al generar el PDF).
+        Se borra la biblioteca FFmpeg de OpenCV al compilar: la cámara no la
+        usa y es la parte de OpenCV que sabe abrir transmisiones de red. La
+        autoprueba verifica que no esté y que la exclusión estricta de red
+        siga pasando con OpenCV y NumPy incluidos.
+Todas las herramientas se volvieron a probar después de cada grupo.
+
+
+6. PENDIENTE EN WINDOWS
+-----------------------
+Estas partes solo existen en Windows y no se pudieron probar en el entorno de
+revisión:
+- Compilar con CREAR_INSTALADOR.bat y confirmar que la autoprueba con
+  exclusión estricta pasa en el .exe.
+- Instalar, confirmar que la regla "Ozone PDF - sin red" esté activa
+  (Get-NetFirewallRule ... -PolicyStore ActiveStore) y desinstalar.
+- Firmar con un certificado real (todas las DLL y PYD además del .exe);
+  probar que una huella con un carácter invisible sea rechazada.
+- Revisar la interfaz con escalado de 125 % y 150 %.
+- Confirmar el espacio en disco y la detección por versión en SCCM o Intune.
+- Repetir la prueba de conexiones con Process Monitor o el registro del
+  firewall.
+
+
+6b. INSTALADOR .MSI (GPO)
+-------------------------
+CREAR_MSI.bat arma un .msi con WiX Toolset 3 a partir del mismo programa ya
+probado (y firmado, si hay certificado). Instala para todos los usuarios en
+C:\Program Files\Ozone PDF, crea los accesos directos y la misma regla de
+firewall (netsh, con la cuenta del sistema), y la borra al desinstalar. Una
+versión nueva reemplaza a la anterior. Escribe en HKLM\Software\Ozone PDF
+solo dos valores que marcan los accesos directos (no contienen datos).
+Para la GPO: carpeta compartida de solo lectura para todos salvo el área de sistemas
+(permisos de recurso y NTFS) y .msi firmado. A diferencia del script de GPO que
+se descartó, acá el que instala es Windows Installer, el mecanismo estándar de
+Windows para esto.
+Pendiente en Windows: armarlo con CREAR_MSI.bat e instalarlo en una PC piloto
+por GPO (se validó la estructura del .msi en Linux con wixl, sin las acciones
+de firewall, que wixl no admite).
+
+
+7. RECOMENDACIONES
+------------------
+- Firmar programa, bibliotecas, instalador y desinstalador con un
+  certificado de firma de código (CREAR_INSTALADOR.bat lo hace si existe
+  firma_huella.txt). Para un proyecto de código abierto, SignPath
+  Foundation ofrece firma gratuita.
+- Clave de firma: no exportable, idealmente en un token USB con PIN. Sin
+  token, firmar en un equipo y usuario dedicados. No dejar PFX en el equipo;
+  si hay respaldo, con contraseña fuerte y guardado fuera de línea. Si se
+  publica un certificado propio en "Raíz de confianza" del dominio, todas
+  las PC confían en lo que se firme con esa clave: tratarla como una
+  credencial de administrador.
+- Instalación: ejecutar el instalador firmado en cada PC (doble clic o
+  comando silencioso), o distribuirlo con SCCM/Intune. No usar scripts de
+  inicio por GPO que ejecuten instaladores desde carpetas compartidas.
+- Publicar el código fuente de cada versión junto con sus descargas, como
+  pide la AGPL-3.0.
+- Verificar que la regla de firewall "Ozone PDF - sin red" exista en las PCs
+  (la crea el instalador).
+- Generar el instalador una vez, en una PC confiable, y distribuir ese mismo
+  archivo.
+- Antes de actualizar componentes: pip-audit, revisar avisos de Artifex y
+  regenerar las huellas de requirements.txt.
+- Procesar documentos de origen confiable: un PDF malicioso podría
+  aprovechar una falla de MuPDF aún no conocida, como en cualquier visor.

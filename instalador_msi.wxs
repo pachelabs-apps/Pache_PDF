@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Instalador MSI de Ozone PDF (para instalar por GPO: Configuración del equipo >
+  Directivas > Configuración de software > Instalación de software).
+  Lo arma CREAR_MSI.bat con WiX Toolset 3, a partir de la carpeta dist\Ozone PDF que
+  genera CREAR_INSTALADOR.bat. Hace lo mismo que el instalador .exe:
+  - instala para todos los usuarios en C:\Program Files\Ozone PDF;
+  - crea los accesos directos en el menú Inicio y el escritorio (de todos los usuarios);
+  - crea la regla de firewall "Ozone PDF - sin red" y la borra al desinstalar;
+  - una versión nueva reemplaza a la anterior (mismo UpgradeCode).
+  Variables que pasa el script: Version, Origen (carpeta dist\Ozone PDF).
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*" Name="Ozone PDF" Language="1034" Codepage="1252" Version="$(var.Version)"
+           Manufacturer="Pache Labs" UpgradeCode="{CBD0A1C2-006C-4D5E-A769-D1B9F031F6B7}">
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" InstallPrivileges="elevated"
+             Platform="x64" Manufacturer="Pache Labs" Description="Ozone PDF $(var.Version)"
+             Comments="Herramientas PDF que funcionan sin conexión. Software libre (AGPL-3.0)."
+             Languages="1034" SummaryCodepage="1252" />
+
+    <MajorUpgrade DowngradeErrorMessage="Ya hay instalada una versión más nueva de Ozone PDF."
+                  Schedule="afterInstallInitialize" />
+    <Media Id="1" Cabinet="ozonepdf.cab" EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="icono.ico" SourceFile="$(var.Assets)/icono.ico" />
+    <Property Id="ARPPRODUCTICON" Value="icono.ico" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+    <Property Id="ARPNOREPAIR" Value="1" />
+
+    <!-- Si está instalada la versión hecha con el instalador .exe (Inno Setup), no se
+         instala encima: hay que desinstalarla primero (son dos instaladores distintos). -->
+    <Property Id="INNO_INSTALADO">
+      <RegistrySearch Id="BuscarInno" Root="HKLM" Win64="yes" Type="raw" Name="UninstallString"
+                      Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{5B3E59AC-D9F8-43C8-ABA7-AE1591EFB8BC}_is1" />
+    </Property>
+    <Condition Message="Ozone PDF ya está instalado con el instalador .exe. Desinstalalo primero desde Configuración &gt; Aplicaciones (o con &quot;C:\Program Files\Ozone PDF\unins000.exe /VERYSILENT&quot;) y volvé a instalar con este .msi.">
+      Installed OR NOT INNO_INSTALADO
+    </Condition>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLFOLDER" Name="Ozone PDF" />
+      </Directory>
+      <Directory Id="ProgramMenuFolder" />
+      <Directory Id="DesktopFolder" />
+    </Directory>
+
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="AvisoUso" Guid="{42F1CA08-EA0B-4314-8537-77D3535F489E}" Win64="yes">
+        <File Id="AVISO_USO.txt" Source="$(var.Raiz)/AVISO_USO.txt" KeyPath="yes" />
+      </Component>
+      <Component Id="Licencia" Guid="{5B65BAC7-1BDB-420E-A0E6-62D3DABBDE4D}" Win64="yes">
+        <File Id="LICENSE.txt" Source="$(var.Raiz)/LICENSE.txt" KeyPath="yes" />
+      </Component>
+      <Component Id="Licencias" Guid="{D079BFDF-2C80-4A6B-87BE-83ED3D0C7870}" Win64="yes">
+        <File Id="LICENCIAS.txt" Source="$(var.Raiz)/LICENCIAS.txt" KeyPath="yes" />
+      </Component>
+      <Component Id="LicenciasTerceros" Guid="{247141FA-F90F-4D42-AD37-7DE099898FA1}" Win64="yes">
+        <File Id="LICENCIAS_TERCEROS.txt" Source="$(var.Raiz)/LICENCIAS_TERCEROS.txt" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <!-- Accesos directos para todos los usuarios (con ALLUSERS=1 Windows usa el menú Inicio
+         y el escritorio públicos). La clave de registro solo marca que están instalados. -->
+    <DirectoryRef Id="ProgramMenuFolder">
+      <Component Id="AccesoMenu" Guid="{085917AC-7D5B-4AA5-8486-1A389DB233FB}" Win64="yes">
+        <Shortcut Id="AccesoMenuInicio" Name="Ozone PDF" Description="Herramientas PDF sin conexión"
+                  Target="[INSTALLFOLDER]Ozone PDF.exe" WorkingDirectory="INSTALLFOLDER" Icon="icono.ico" />
+        <RegistryValue Root="HKLM" Key="Software\Ozone PDF" Name="AccesoMenu" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+    <DirectoryRef Id="DesktopFolder">
+      <Component Id="AccesoEscritorio" Guid="{D6C7F5F6-F681-4388-B664-B7A47D240D93}" Win64="yes">
+        <Shortcut Id="AccesoEscritorio" Name="Ozone PDF" Description="Herramientas PDF sin conexión"
+                  Target="[INSTALLFOLDER]Ozone PDF.exe" WorkingDirectory="INSTALLFOLDER" Icon="icono.ico" />
+        <RegistryValue Root="HKLM" Key="Software\Ozone PDF" Name="AccesoEscritorio" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <!-- Regla de firewall: la misma que crea el instalador .exe. Se ejecuta con la cuenta del
+         sistema (Impersonate="no"), como pide una instalación por GPO. Primero se borra una
+         regla vieja con el mismo nombre (actualizaciones) y después se crea. Al desinstalar
+         se borra, salvo que la desinstalación sea parte de una actualización. -->
+    <CustomAction Id="FirewallBorrarPrevia" Directory="INSTALLFOLDER" Execute="deferred" Impersonate="no" Return="ignore"
+                  ExeCommand="&quot;[System64Folder]netsh.exe&quot; advfirewall firewall delete rule name=&quot;Ozone PDF - sin red&quot;" />
+    <CustomAction Id="FirewallAgregar" Directory="INSTALLFOLDER" Execute="deferred" Impersonate="no" Return="ignore"
+                  ExeCommand="&quot;[System64Folder]netsh.exe&quot; advfirewall firewall add rule name=&quot;Ozone PDF - sin red&quot; dir=out action=block enable=yes program=&quot;[INSTALLFOLDER]Ozone PDF.exe&quot;" />
+    <CustomAction Id="FirewallBorrar" Directory="INSTALLFOLDER" Execute="deferred" Impersonate="no" Return="ignore"
+                  ExeCommand="&quot;[System64Folder]netsh.exe&quot; advfirewall firewall delete rule name=&quot;Ozone PDF - sin red&quot;" />
+    <InstallExecuteSequence>
+      <Custom Action="FirewallBorrarPrevia" After="InstallFiles">NOT REMOVE~="ALL"</Custom>
+      <Custom Action="FirewallAgregar" After="FirewallBorrarPrevia">NOT REMOVE~="ALL"</Custom>
+      <Custom Action="FirewallBorrar" Before="RemoveFiles">REMOVE~="ALL" AND NOT UPGRADINGPRODUCTCODE</Custom>
+    </InstallExecuteSequence>
+
+    <Feature Id="Principal" Title="Ozone PDF" Level="1">
+      <ComponentGroupRef Id="ArchivosPrograma" />
+      <ComponentRef Id="AvisoUso" />
+      <ComponentRef Id="Licencia" />
+      <ComponentRef Id="Licencias" />
+      <ComponentRef Id="LicenciasTerceros" />
+      <ComponentRef Id="AccesoMenu" />
+      <ComponentRef Id="AccesoEscritorio" />
+    </Feature>
+  </Product>
+</Wix>

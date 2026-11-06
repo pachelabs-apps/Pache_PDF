@@ -1,0 +1,58 @@
+Ozone PDF 1.1.0 - Licencias de los componentes
+===============================================
+
+Todos los componentes son gratuitos. No hay que pagar nada para usarlos.
+
+Componente          Para qué se usa                    Licencia
+------------------  ---------------------------------  ----------------------------------------
+PyMuPDF 1.28.2      Motor PDF (unir, comprimir, etc.)  AGPL-3.0 (o licencia comercial opcional
+  (MuPDF)                                              de Artifex, NO necesaria para este uso)
+Pillow 13.0.0       Logo, íconos e imágenes            MIT-CMU (libre)
+tkinterdnd2 0.6.4   Arrastrar y soltar archivos        MIT (libre); incluye tkdnd, licencia BSD
+OpenCV 5.0.0        Cámara (Fotos a PDF)               Apache-2.0 (libre); paquete pip: MIT
+NumPy 2.5.4         Requerido por OpenCV               BSD-3-Clause (libre); incluye OpenBLAS (BSD)
+Python 3.12         Lenguaje del programa              PSF License (libre)
+Tcl/Tk (tkinter)    Ventanas de la interfaz            BSD (libre)
+PyInstaller 6.22.3  Arma el .exe (solo al compilar)    GPL-2.0 con excepción que permite
+                                                       distribuir programas armados con él
+Inno Setup 6        Arma el instalador (al compilar)   Licencia propia: uso libre para cualquier
+                                                       fin, incluso comercial
+winget              Instala Python/Inno (al compilar)  MIT (viene con Windows)
+altgraph, packaging, pefile, pywin32-ctypes, setuptools,
+pyinstaller-hooks-contrib                              MIT / Apache-2.0 / BSD (dependencias de
+                                                       PyInstaller, solo al compilar)
+
+
+SOBRE LA LICENCIA DE Ozone PDF (AGPL-3.0)
+------------------------------------------
+Ozone PDF es software libre bajo la GNU AGPL-3.0 (Copyright 2026 Nicolás
+Emanuel Pacheco), la misma licencia que PyMuPDF. Podés usarlo gratis para
+cualquier fin, copiarlo y compartirlo. Su código fuente completo se publica
+junto con cada versión. Si distribuís una versión modificada, la AGPL pide
+publicar también su código fuente bajo la misma licencia.
+El texto completo de la AGPL-3.0 está en LICENSE.txt.
+
+
+SOBRE INNO SETUP
+----------------
+Su licencia permite el uso gratuito para cualquier fin. El autor pide (no
+exige) que los usuarios comerciales compren una licencia como apoyo al
+proyecto. Ozone PDF es un proyecto gratuito, sin fines comerciales.
+
+
+Textos completos de las licencias: LICENCIAS_TERCEROS.txt (se instala junto al
+programa) reproduce los avisos de copyright y las licencias completas de Pillow,
+tkinterdnd2, tkdnd, Python, Tcl/Tk, OpenCV, NumPy y el cargador de PyInstaller, como piden las
+licencias MIT, BSD y PSF. La AGPL-3.0 (PyMuPDF y Ozone PDF) está en LICENSE.txt.
+Referencias en línea:
+- AGPL-3.0:     https://www.gnu.org/licenses/agpl-3.0.html
+- PyMuPDF:      https://pymupdf.readthedocs.io/
+- Pillow:       https://github.com/python-pillow/Pillow/blob/main/LICENSE
+- tkinterdnd2:  https://github.com/Eliav2/tkinterdnd2/blob/main/LICENSE
+- OpenCV:       https://opencv.org/license/
+- NumPy:        https://numpy.org/doc/stable/license.html
+- Python:       https://docs.python.org/3/license.html
+- PyInstaller:  https://pyinstaller.org/en/stable/license.html
+- Inno Setup:   https://jrsoftware.org/files/is/license.txt
+
+Nota: esto es un resumen informativo, no asesoramiento legal.

@@ -1,0 +1,25 @@
+﻿Ozone PDF 1.1.0
+
+¡Hola! Gracias por instalar Ozone PDF.
+
+Lo armé porque en el trabajo veía que, para unir o achicar un PDF, terminábamos
+subiendo documentos a páginas de internet. Este programa hace lo mismo, pero en
+tu computadora: los archivos no se suben a ningún lado.
+
+Algunas cosas que conviene saber:
+
+- Funciona sin internet. Al instalarlo se agrega una regla en el firewall de
+  Windows que no lo deja conectarse.
+- Tu archivo original no se toca: siempre se guarda una copia nueva.
+- Es gratis y no tiene publicidad. No hace falta registrarse.
+- El código es abierto (licencia GNU AGPL-3.0), así que cualquiera puede
+  revisarlo.
+
+Lo pruebo bastante antes de cada versión, pero, como todo programa gratuito, se
+entrega tal como está y sin garantía. El texto legal completo está en
+LICENSE.txt, y las licencias de las herramientas que usa, en LICENCIAS.txt.
+
+Si encontrás un error o tenés una idea, contame a pache.labs@gmail.com.
+
+Nicolás Pacheco (Pache)
+Pache Labs
