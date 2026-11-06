@@ -13,8 +13,9 @@ Tus documentos nunca salen de tu computadora.</p>
 
 ## Por qué lo hice
 
-En el trabajo veía que, para unir o achicar un PDF, terminábamos subiendo contratos,
-recibos y DNI a páginas web que no sabemos quién maneja. Ozone PDF hace lo mismo, pero
+Vi a muchas personas que trabajan con información sensible, en distintos rubros, usar
+páginas de internet para unir o achicar un PDF: contratos, recibos de sueldo y DNI
+terminaban subidos a sitios que nadie sabe quién maneja. Ozone PDF hace lo mismo, pero
 todo pasa en tu computadora:
 
 - Funciona sin internet. El programa no tiene con qué conectarse, y el instalador además
@@ -46,6 +47,9 @@ todo pasa en tu computadora:
 También tiene buscador de herramientas (Ctrl+F), modo claro, oscuro o automático,
 menú que se puede colapsar y arrastrar y soltar archivos.
 
+**Idiomas:** español, inglés, alemán, chino simplificado, japonés y ruso. La primera vez
+usa el idioma de Windows, y se cambia desde "Idioma" en el pie del menú.
+
 ## Descargar
 
 Andá a **[Releases](../../releases)** y bajá el instalador:
@@ -73,6 +77,8 @@ están en [INFORME_SEGURIDAD.txt](INFORME_SEGURIDAD.txt).
 
 Ozone PDF es software libre bajo la [GNU AGPL-3.0](LICENSE.txt).
 © 2026 Nicolás Emanuel Pacheco (Pache Labs).
+
+Las traducciones están en `traducciones.py`: si ves algo mal traducido, avisame.
 
 Usa PyMuPDF/MuPDF (AGPL-3.0), Pillow, OpenCV, NumPy, tkinterdnd2 y Python, cada uno
 con su licencia (ver [LICENCIAS.txt](LICENCIAS.txt)).

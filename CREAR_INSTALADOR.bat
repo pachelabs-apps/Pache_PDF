@@ -2,7 +2,7 @@
 setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
 cd /d "%~dp0"
-set "VERSION=1.1.0"
+set "VERSION=1.2.0"
 title Crear instalador - Ozone PDF %VERSION%
 echo.
 echo  ==========================================

@@ -1,10 +1,11 @@
-﻿Ozone PDF 1.1.0
+﻿Ozone PDF 1.2.0
 
 ¡Hola! Gracias por instalar Ozone PDF.
 
-Lo armé porque en el trabajo veía que, para unir o achicar un PDF, terminábamos
-subiendo documentos a páginas de internet. Este programa hace lo mismo, pero en
-tu computadora: los archivos no se suben a ningún lado.
+Lo armé porque vi a muchas personas que trabajan con información sensible, en
+distintos rubros, usar páginas de internet para unir o achicar un PDF. Este
+programa hace lo mismo, pero en tu computadora: los archivos no se suben a
+ningún lado.
 
 Algunas cosas que conviene saber:
 

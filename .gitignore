@@ -1,0 +1,15 @@
+# Archivos que se generan al compilar o probar: no se suben al repositorio
+__pycache__/
+*.pyc
+.venv-build/
+build/
+dist/
+obj_msi/
+instalador/
+*.spec
+# Datos propios de cada PC (no son parte del código)
+firma_huella.txt
+msix_identidad.txt
+.venv/
+compilacion.txt
+ozonepdf_autotest.txt

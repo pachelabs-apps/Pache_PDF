@@ -30,6 +30,15 @@ import string
 import time
 
 import pymupdf
+
+try:  # textos traducidos (si el módulo no está, todo queda en español)
+    from idioma import T, N
+except Exception:  # pragma: no cover
+    def T(texto, **datos):
+        return texto.format(**datos) if datos else texto
+
+    def N(n, singular, plural, **datos):
+        return T(singular if n == 1 else plural, n=n, **datos)
 from PIL import Image, ImageOps, ImageSequence
 
 
@@ -55,7 +64,7 @@ def _seguir(cancelar):
     a la ventana (PyMuPDF no la deja actualizarse mientras dibuja una página)."""
     if cancelar is not None:
         if cancelar.is_set():
-            raise Cancelado("Operación cancelada.")
+            raise Cancelado(T("Operación cancelada."))
         time.sleep(0.002)
 
 
@@ -217,17 +226,18 @@ def _abrir(ruta, permiso=None):
     s = seguridad(d)
     if s == "clave":
         d.close()
-        raise ValueError(f"\u201c{nombre}\u201d tiene contraseña para abrirse. "
-                         "Quitala primero con \u201cQuitar contraseña\u201d.")
+        raise ValueError(T("\u201c{nombre}\u201d tiene contraseña para abrirse. "
+                           "Quitala primero con \u201cQuitar contraseña\u201d.", nombre=nombre))
     if s == "restringido" and not (permiso and d.permissions & permiso):
         d.close()
         if permiso:
-            raise ValueError(f"\u201c{nombre}\u201d tiene restricciones de seguridad que no permiten "
-                             f"{QUE_PERMITE.get(permiso, 'esta operación')}. Para quitarlas hace falta la "
-                             "contraseña de propietario (\u201cQuitar contraseña\u201d).")
-        raise ValueError(f"\u201c{nombre}\u201d tiene restricciones de seguridad que no permiten "
-                         "modificarlo. Para quitarlas hace falta la contraseña de propietario "
-                         "(\u201cQuitar contraseña\u201d).")
+            raise ValueError(T("\u201c{nombre}\u201d tiene restricciones de seguridad que no permiten "
+                               "{que}. Para quitarlas hace falta la "
+                               "contraseña de propietario (\u201cQuitar contraseña\u201d).",
+                               nombre=nombre, que=T(QUE_PERMITE.get(permiso, "esta operación"))))
+        raise ValueError(T("\u201c{nombre}\u201d tiene restricciones de seguridad que no permiten "
+                           "modificarlo. Para quitarlas hace falta la contraseña de propietario "
+                           "(\u201cQuitar contraseña\u201d).", nombre=nombre))
     return d
 
 
@@ -348,11 +358,12 @@ def parse_rango(texto, total):
             else:
                 a = b = int(parte)
         except ValueError:
-            raise ValueError(f"No se entiende \u201c{parte}\u201d. Usá números, comas y guiones, "
-                             "por ejemplo: 1-3,5,8-")
+            raise ValueError(T("No se entiende \u201c{parte}\u201d. Usá números, comas y guiones, "
+                               "por ejemplo: 1-3,5,8-", parte=parte))
         if a < 1 or b > total or a > b:
-            raise ValueError(f"El rango \u201c{parte}\u201d no es válido: el documento tiene {total} "
-                             f"página{'s' if total != 1 else ''}.")
+            raise ValueError(N(total, "El rango \u201c{parte}\u201d no es válido: el documento tiene {n} página.",
+                               "El rango \u201c{parte}\u201d no es válido: el documento tiene {n} páginas.",
+                               parte=parte))
         paginas.extend(range(a - 1, b))
     return paginas
 
@@ -360,21 +371,22 @@ def parse_rango(texto, total):
 def validar_formato_numeracion(formato):
     """Solo admite {n} y {total}, sin opciones de formato (evita textos gigantes como {n:>200000000})."""
     if len(formato) > 100:
-        raise ValueError("El formato de numeración es demasiado largo (máximo 100 caracteres).")
+        raise ValueError(T("El formato de numeración es demasiado largo (máximo 100 caracteres)."))
     try:
         partes = list(string.Formatter().parse(formato))
     except ValueError:
-        raise ValueError("El formato tiene una llave { o } sin cerrar.\n\n"
-                         "Usá {n} para el número y {total} para el total. "
-                         "Para escribir una llave, poné {{ o }}.")
+        raise ValueError(T("El formato tiene una llave { o } sin cerrar.\n\n"
+                           "Usá {n} para el número y {total} para el total. "
+                           "Para escribir una llave, poné {{ o }}."))
     for _, campo, opciones, conversion in partes:
         if campo is None:
             continue
         if campo not in ("n", "total"):
-            raise ValueError(f"El formato solo admite {{n}} y {{total}}; no se reconoce \u201c{{{campo}}}\u201d.")
+            raise ValueError(T("El formato solo admite {{n}} y {{total}}; no se reconoce \u201c{campo}\u201d.",
+                               campo="{" + campo + "}"))
         if opciones or conversion:
-            raise ValueError("El formato no admite opciones dentro de las llaves (por ejemplo {n:5}). "
-                             "Usá solo {n} y {total}.")
+            raise ValueError(T("El formato no admite opciones dentro de las llaves (por ejemplo {n:5}). "
+                               "Usá solo {n} y {total}."))
 
 
 def unir(archivos, salida, cancelar=None):
@@ -430,12 +442,12 @@ def dividir(archivo, carpeta, modo="cada", valor="1", cancelar=None):
             except ValueError:
                 paso = 0
             if paso < 1:
-                raise ValueError("Indicá cada cuántas páginas dividir con un número entero, por ejemplo 2.")
+                raise ValueError(T("Indicá cada cuántas páginas dividir con un número entero, por ejemplo 2."))
             grupos = [list(range(i, min(i + paso, n))) for i in range(0, n, paso)]
         else:
             grupos = [parse_rango(r, n) for r in str(valor).split(",") if r.strip()]
             if not grupos:
-                raise ValueError("Indicá los rangos, por ejemplo: 1-3,4-8,9-")
+                raise ValueError(T("Indicá los rangos, por ejemplo: 1-3,4-8,9-"))
         for i, grupo in enumerate(grupos, 1):
             out = pymupdf.open()
             try:
@@ -479,7 +491,7 @@ def dividir_por_tamano(archivo, carpeta, mb, cancelar=None):
     except ValueError:
         limite = 0
     if limite <= 0:
-        raise ValueError("Indicá el tamaño máximo de cada parte en MB, por ejemplo 25.")
+        raise ValueError(T("Indicá el tamaño máximo de cada parte en MB, por ejemplo 25."))
     os.makedirs(carpeta, exist_ok=True)
     base = os.path.splitext(os.path.basename(archivo))[0]
     generados, grandes = [], 0
@@ -556,8 +568,8 @@ def comprimir(archivo, salida, nivel="media", cancelar=None):
             os.remove(salida)
         except OSError:
             pass
-        raise SinCambios("Este PDF ya está optimizado: comprimirlo no lo achica, así que no se "
-                         "generó ningún archivo nuevo.")
+        raise SinCambios(T("Este PDF ya está optimizado: comprimirlo no lo achica, así que no se "
+                           "generó ningún archivo nuevo."))
     return antes, despues
 
 
@@ -574,7 +586,7 @@ def eliminar_paginas(archivo, salida, rango, cancelar=None):
         quitar = set(parse_rango(rango, d.page_count))
         quedan = [i for i in range(d.page_count) if i not in quitar]
         if not quedan:
-            raise ValueError("No se pueden eliminar todas las páginas.")
+            raise ValueError(T("No se pueden eliminar todas las páginas."))
         d.select(quedan)
         _seguir(cancelar)
         _guardar(d, salida)
@@ -766,7 +778,7 @@ def _cuadros_imagen(ruta):
                 f.save(buf, format="PNG", optimize=True)
             cuadros.append((buf.getvalue(), f.width * 72.0 / dx, f.height * 72.0 / dy))
     if not cuadros:
-        raise ValueError(f"No se pudo leer la imagen: {os.path.basename(ruta)}")
+        raise ValueError(T("No se pudo leer la imagen: {nombre}", nombre=os.path.basename(ruta)))
     return cuadros
 
 
@@ -806,8 +818,9 @@ def imagenes_a_pdf(imagenes, salida, tamano="A4", cancelar=None):
             except ValueError:
                 raise
             except Exception:
-                raise ValueError(f"No se pudo leer la imagen \u201c{os.path.basename(img)}\u201d. "
-                                 "Verificá que sea JPG, PNG, BMP, TIFF o WEBP y que no esté dañada.")
+                raise ValueError(T("No se pudo leer la imagen \u201c{nombre}\u201d. "
+                                   "Verificá que sea JPG, PNG, BMP, TIFF o WEBP y que no esté dañada.",
+                                   nombre=os.path.basename(img)))
             for datos, w, h in cuadros:
                 if rect_pag is None:
                     if max(w, h) > MAX_LADO_PT:  # que el lector pueda abrir la página
@@ -859,7 +872,7 @@ def numerar(archivo, salida, posicion="abajo-centro", formato="{n} / {total}", i
             cancelar=None):
     validar_formato_numeracion(formato)
     if inicio < 1:
-        raise ValueError("\u201cEmpezar en\u201d tiene que ser 1 o más.")
+        raise ValueError(T("\u201cEmpezar en\u201d tiene que ser 1 o más."))
     fuente, ttf = _fuente()
     nombre = "NumPDF" if ttf else "helv"
     with _abrir(archivo) as d:
@@ -906,7 +919,7 @@ def desproteger(archivo, salida, password, cancelar=None):
     Devuelve {"restricciones_mantenidas": bool}."""
     with pymupdf.open(archivo) as d:
         if not esta_cifrado(d):
-            raise ValueError("Este PDF no tiene contraseña.")
+            raise ValueError(T("Este PDF no tiene contraseña."))
         if seguridad(d) == "libre":
             # cifrado sin clave y sin restricciones: no hay nada que proteger, se guarda sin cifrar
             _seguir(cancelar)
@@ -918,7 +931,7 @@ def desproteger(archivo, salida, password, cancelar=None):
         es_propietario = bool(rc & 4)
         valida = rc > 0 if pide_apertura else es_propietario
         if not valida:
-            raise ValueError("Contraseña incorrecta.")
+            raise ValueError(T("Contraseña incorrecta."))
         _seguir(cancelar)
         restringido = (d.permissions & PERMISOS_TODOS) != PERMISOS_TODOS
         if not es_propietario and restringido:

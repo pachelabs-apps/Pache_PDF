@@ -1,4 +1,4 @@
-Ozone PDF 1.1.0 - Informe de seguridad
+Ozone PDF 1.2.0 - Informe de seguridad
 =======================================
 Fecha de revisión: 24/10/2026 (incluye las correcciones de varias revisiones técnicas del código)
 
@@ -13,7 +13,7 @@ instalador crea.
 
 1. USO DE RED
 -------------
-Verificado sobre la versión 1.1.0 (en Linux, sobre el código fuente y sobre el
+Verificado sobre la versión 1.2.0 (en Linux, sobre el código fuente y sobre el
 ejecutable armado con PyInstaller; en Windows, ver "Pendiente en Windows"):
 - Revisión del código: no hay ninguna instrucción de red.
 - Las 15 herramientas funcionan con la red desconectada por completo.
@@ -279,6 +279,14 @@ Versión pública "Ozone PDF" (05/11/2026):
         usa y es la parte de OpenCV que sabe abrir transmisiones de red. La
         autoprueba verifica que no esté y que la exclusión estricta de red
         siga pasando con OpenCV y NumPy incluidos.
+Versión 1.2.0 (06/11/2026):
+        Idiomas: español, inglés, alemán, chino simplificado, japonés y ruso.
+        La primera vez usa el idioma de Windows; se cambia desde "Idioma" en el
+        pie del menú y se recuerda. Los textos están en traducciones.py (si
+        falta alguno, se muestra en español). Para chino y japonés usa las
+        fuentes de Windows que traen esos caracteres. Links de donación
+        (Cafecito y GitHub Sponsors) abajo a la izquierda; solo abren el
+        navegador, el programa sigue sin conectarse.
 Todas las herramientas se volvieron a probar después de cada grupo.
 
 

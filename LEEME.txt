@@ -1,4 +1,4 @@
-Ozone PDF - Versión 1.1.0
+Ozone PDF - Versión 1.2.0
 ==========================
 Herramientas PDF tipo iLovePDF que funcionan 100% en tu computadora.
 Ningún archivo se sube a internet: el programa no usa la red.
@@ -65,7 +65,7 @@ CREAR EL INSTALADOR (se hace una sola vez, en una PC con internet)
      - genera el instalador (firmado, si corresponde)
 3. Al terminar se abre la carpeta "instalador" con:
 
-        Instalar_Ozone_PDF_1.1.0.exe
+        Instalar_Ozone_PDF_1.2.0.exe
 
    Ese es el único archivo que tenés que copiar o compartir.
 
@@ -93,7 +93,7 @@ se instala si ya está el otro.
 
 INSTALAR EN CADA PC
 -------------------
-Doble clic en Instalar_Ozone_PDF_1.1.0.exe > Siguiente > Instalar.
+Doble clic en Instalar_Ozone_PDF_1.2.0.exe > Siguiente > Instalar.
 - Se instala para todos los usuarios en C:\Program Files\Ozone PDF y pide
   permisos de administrador.
 - Crea una regla de firewall que bloquea toda salida a red del programa.
@@ -140,7 +140,7 @@ Se generan al compilar (se pueden borrar): .venv-build\, .venv\, build\,
 dist\, instalador\, compilacion.txt (modo de exclusión de red) y
 "Ozone PDF.spec" (receta que genera PyInstaller).
 
-Para sacar una versión nueva: cambiar el número (hoy 1.1.0) en app.py
+Para sacar una versión nueva: cambiar el número (hoy 1.2.0) en app.py
 (APP_VERSION), instalador.iss (AppVersion y VersionInfoVersion),
 version_info.txt y CREAR_INSTALADOR.bat (VERSION). Esos cuatro son los que
 cambian el programa. El número también aparece en los textos: LEEME.txt,

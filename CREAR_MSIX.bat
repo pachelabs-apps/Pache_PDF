@@ -34,7 +34,7 @@ if not exist "msix_identidad.txt" (
   > "msix_identidad.txt" echo PEGAR-ACA-Package-Identity-Name
   >> "msix_identidad.txt" echo CN=PEGAR-ACA-Package-Identity-Publisher
   echo  Se creo msix_identidad.txt. Abrilo y pega los dos datos que muestra Partner Center
-  echo  en "Identidad del producto" (Package/Identity/Name y Package/Identity/Publisher).
+  echo  en "Identidad del producto" ^(Package/Identity/Name y Package/Identity/Publisher^).
   echo  Despues volve a ejecutar este script.
   goto fin_error
 )

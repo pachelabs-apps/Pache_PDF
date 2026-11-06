@@ -1,4 +1,4 @@
-Ozone PDF 1.1.0 - Textos completos de las licencias de terceros
+Ozone PDF 1.2.0 - Textos completos de las licencias de terceros
 ================================================================
 
 Este archivo reproduce los avisos de copyright y las licencias de los componentes

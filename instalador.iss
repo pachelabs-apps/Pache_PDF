@@ -1,10 +1,10 @@
-﻿; Instalador de Ozone PDF 1.1.0 (Inno Setup 6.3 o posterior)
+﻿; Instalador de Ozone PDF 1.2.0 (Inno Setup 6.3 o posterior)
 ; No hace falta abrir este archivo: CREAR_INSTALADOR.bat lo compila solo.
 ; Si hay certificado configurado, el .bat define FIRMAR y la herramienta "firma"
 ; (signtool /sha1 <huella>), y Inno firma el instalador y el desinstalador.
 
 #define AppName "Ozone PDF"
-#define AppVersion "1.1.0"
+#define AppVersion "1.2.0"
 
 [Setup]
 AppId={{5B3E59AC-D9F8-43C8-ABA7-AE1591EFB8BC}
@@ -12,7 +12,7 @@ AppName={#AppName}
 AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppVersion}
 AppPublisher=Pache Labs (Nicolás Emanuel Pacheco)
-VersionInfoVersion=1.1.0.0
+VersionInfoVersion=1.2.0.0
 VersionInfoProductName={#AppName}
 VersionInfoDescription=Instalador de {#AppName} {#AppVersion}
 ; Programa de 64 bits: se instala en "Program Files" (no en "Program Files (x86)")

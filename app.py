@@ -17,10 +17,12 @@ except Exception:  # si no está disponible, la app funciona igual con el botón
     TkinterDnD = None
 
 import pdf_core as core
+import idioma
+from idioma import T, N
 
 APP_NOMBRE = "Ozone PDF"
 APP_MARCA = "Pache Labs"   # familia de herramientas gratuitas de Nicolás Emanuel Pacheco
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 
 # Paletas de colores. Los nombres se usan como variables globales; aplicar_tema() las
 # reemplaza y la ventana se reconstruye con los colores nuevos.
@@ -101,6 +103,13 @@ AVISO_INFO = PALETA_CLARA["AVISO_INFO"]
 SOMBRA = PALETA_CLARA["SOMBRA"]
 
 
+def aplicar_idioma(codigo):
+    """Elige el idioma de la interfaz y una fuente que tenga sus caracteres."""
+    global FUENTE
+    idioma.configurar(codigo)
+    FUENTE = idioma.fuente_para_idioma(FUENTE_BASE)
+
+
 def aplicar_tema(oscuro):
     """Carga la paleta clara u oscura en las variables globales de colores."""
     global TEMA_OSCURO
@@ -151,7 +160,8 @@ def tema_sistema():
         return False
 
 
-FUENTE = "Segoe UI" if sys.platform == "win32" else "Helvetica"
+FUENTE_BASE = "Segoe UI" if sys.platform == "win32" else "Helvetica"
+FUENTE = FUENTE_BASE  # cambia a una fuente con caracteres chinos o japoneses si hace falta
 
 
 def recurso(nombre):
@@ -174,10 +184,10 @@ def modo_compilacion():
 def texto_modo_compilacion():
     m = modo_compilacion()
     if m == "estricta":
-        return "Exclusión de red estricta: el programa no incluye socket, asyncio, multiprocessing, HTTP, SSL, correo ni FTP."
+        return T("Exclusión de red estricta: el programa no incluye socket, asyncio, multiprocessing, HTTP, SSL, correo ni FTP.")
     if m == "reducida":
-        return "Exclusión de red REDUCIDA: no incluye HTTP, SSL, correo ni FTP, pero sí socket (ver informe de seguridad)."
-    return "Ejecución desde el código fuente (sin compilar)."
+        return T("Exclusión de red REDUCIDA: no incluye HTTP, SSL, correo ni FTP, pero sí socket (ver informe de seguridad).")
+    return T("Ejecución desde el código fuente (sin compilar).")
 
 
 def archivo_base(nombre):
@@ -313,24 +323,26 @@ def traducir_error(e):
     texto = str(e) or e.__class__.__name__
     t = texto.lower()
     if isinstance(e, PermissionError) or "permission denied" in t or "errno 13" in t:
-        return ("No se pudo escribir el archivo. Puede que esté abierto en otro programa "
-                "o que no tengas permiso en esa carpeta.")
+        return T("No se pudo escribir el archivo. Puede que esté abierto en otro programa "
+                 "o que no tengas permiso en esa carpeta.")
     if isinstance(e, FileNotFoundError):
-        return "No se encontró uno de los archivos. Puede que se haya movido o borrado."
+        return T("No se encontró uno de los archivos. Puede que se haya movido o borrado.")
     if "no space" in t or "errno 28" in t:
-        return "No hay espacio suficiente en el disco."
+        return T("No hay espacio suficiente en el disco.")
     if "cannot open" in t or "failed to open" in t or "no objects found" in t or "format error" in t:
-        return "No se pudo abrir uno de los archivos. Verificá que no esté dañado."
+        return T("No se pudo abrir uno de los archivos. Verificá que no esté dañado.")
     if "invalid literal" in t or "keyerror" in t:
-        return "Hay un dato mal escrito en las opciones. Revisá los campos e intentá de nuevo."
+        return T("Hay un dato mal escrito en las opciones. Revisá los campos e intentá de nuevo.")
     if "not a pdf" in t or "is no pdf" in t or "not a pdf document" in t:
-        return "Uno de los archivos no es un PDF."
+        return T("Uno de los archivos no es un PDF.")
+    if idioma.es_propio(texto) or isinstance(e, (core.SinCambios, core.Cancelado)):
+        return texto  # mensajes propios del programa, ya traducidos
     if isinstance(e, ValueError) and texto and texto[0].isupper() and not texto.isascii():
-        return texto  # mensajes propios del programa, ya en español
+        return texto
     if isinstance(e, ValueError) and any(p in texto for p in ("Indicá", "Escribí", "Las contraseñas", "No se ")):
         return texto
-    return ("Ocurrió un error inesperado al procesar los archivos. Verificá que sean del tipo "
-            f"correcto y que no estén dañados.\n\n(Detalle técnico: {texto[:200]})")
+    return T("Ocurrió un error inesperado al procesar los archivos. Verificá que sean del tipo "
+             "correcto y que no estén dañados.\n\n(Detalle técnico: {detalle})", detalle=texto[:200])
 
 
 def mismo_archivo(a, b):
@@ -382,7 +394,9 @@ def sin_tildes(s):
 
 
 def texto_busqueda(h):
-    return sin_tildes(" ".join([h["titulo"], h["desc"], CLAVES_BUSQUEDA.get(h["id"], "")]))
+    # se busca en español y en el idioma elegido (el nombre, la descripción y palabras clave)
+    return sin_tildes(" ".join([h["titulo"], h["desc"], CLAVES_BUSQUEDA.get(h["id"], ""),
+                                T(h["titulo"]), T(h["desc"]), T(CLAVES_BUSQUEDA.get(h["id"], ""))]))
 
 
 def limpiar_fotos_viejas():
@@ -479,18 +493,20 @@ def ejecutar(h, archivos, destino, op, cancelar=None):
     c = cancelar
     if hid == "unir":
         core.unir(archivos, destino, cancelar=c)
-        return f"Se unieron {len(archivos)} archivos."
+        return T("Se unieron {n} archivos.", n=len(archivos))
     if hid == "dividir":
         if op["modo"].startswith("Por tamaño"):
             partes, grandes = core.dividir_por_tamano(a, destino, op["valor"], cancelar=c)
-            msg = f"Se generaron {len(partes)} archivos de hasta {op['valor'].strip()} MB."
+            msg = T("Se generaron {n} archivos de hasta {mb} MB.", n=len(partes), mb=op['valor'].strip())
             if grandes:
-                msg += (f" {grandes} parte{'s' if grandes != 1 else ''} supera{'n' if grandes != 1 else ''} el "
-                        "límite porque tiene una sola página más pesada que eso (una página no se puede partir).")
+                msg += " " + N(grandes, "{n} parte supera el límite porque tiene una sola página más pesada "
+                                        "que eso (una página no se puede partir).",
+                               "{n} partes superan el límite porque tienen una sola página más pesada "
+                               "que eso (una página no se puede partir).")
             return msg
         modo = "cada" if op["modo"].startswith("Cada") else "rangos"
         partes = core.dividir(a, destino, modo, op["valor"], cancelar=c)
-        return f"Se generaron {len(partes)} archivos."
+        return T("Se generaron {n} archivos.", n=len(partes))
     if hid == "comprimir":
         nivel = op["nivel"].split()[0].lower()
         antes, despues = core.comprimir(a, destino, nivel, cancelar=c)  # si no achica, lanza SinCambios
@@ -499,11 +515,11 @@ def ejecutar(h, archivos, destino, op, cancelar=None):
         core.extraer_paginas(a, destino, op["rango"], cancelar=c)
     elif hid == "eliminar":
         if not op["rango"].strip():
-            raise ValueError("Indicá qué páginas eliminar.")
+            raise ValueError(T("Indicá qué páginas eliminar."))
         core.eliminar_paginas(a, destino, op["rango"], cancelar=c)
     elif hid == "reordenar":
         if not op["orden"].strip():
-            raise ValueError("Indicá el nuevo orden de páginas.")
+            raise ValueError(T("Indicá el nuevo orden de páginas."))
         core.reordenar(a, destino, op["orden"], cancelar=c)
     elif hid == "rotar":
         g = {"90° a la derecha": 90, "180°": 180, "90° a la izquierda": 270}[op["grados"]]
@@ -512,20 +528,20 @@ def ejecutar(h, archivos, destino, op, cancelar=None):
         core.numerar(a, destino, op["posicion"], op["formato"], int(op["inicio"] or 1), cancelar=c)
     elif hid == "marca":
         if not op["texto"].strip():
-            raise ValueError("Escribí el texto de la marca de agua.")
+            raise ValueError(T("Escribí el texto de la marca de agua."))
         opac = {"Suave": 0.18, "Media": 0.3, "Fuerte": 0.5}[op["opacidad"]]
         core.marca_agua(a, destino, op["texto"], opac, cancelar=c)
     elif hid == "pdf2img":
         imgs, reducidas = core.pdf_a_imagenes(a, destino, int(op["dpi"]), op["formato"], cancelar=c)
-        msg = f"Se generaron {len(imgs)} imágenes."
+        msg = T("Se generaron {n} imágenes.", n=len(imgs))
         if reducidas:
-            msg += (f" {reducidas} página{'s' if reducidas != 1 else ''} muy grande{'s' if reducidas != 1 else ''} "
-                    "se exportaron con menor resolución para no agotar la memoria.")
+            msg += " " + N(reducidas, "{n} página muy grande se exportó con menor resolución para no agotar la memoria.",
+                           "{n} páginas muy grandes se exportaron con menor resolución para no agotar la memoria.")
         return msg
     elif hid == "img2pdf":
         core.imagenes_a_pdf(archivos, destino, op["tamano"], cancelar=c)
         n = len(archivos)
-        return f"Se convirti{'eron' if n != 1 else 'ó'} {n} imagen{'es' if n != 1 else ''}."
+        return N(n, "Se convirtió {n} imagen.", "Se convirtieron {n} imágenes.")
     elif hid == "camara":
         modo = {"Escala de grises": "gris", "Documento (blanco y negro)": "documento"}.get(op["color"])
         fotos, temporal = archivos, None
@@ -539,22 +555,22 @@ def ejecutar(h, archivos, destino, op, cancelar=None):
             if temporal:
                 shutil.rmtree(temporal, ignore_errors=True)
         n = len(archivos)
-        return f"Se armó un PDF con {n} foto{'s' if n != 1 else ''}."
+        return N(n, "Se armó un PDF con {n} foto.", "Se armó un PDF con {n} fotos.")
     elif hid == "proteger":
         if not op["password"]:
-            raise ValueError("Escribí una contraseña.")
+            raise ValueError(T("Escribí una contraseña."))
         if op["password"] != op["password2"]:
-            raise ValueError("Las contraseñas no coinciden.")
+            raise ValueError(T("Las contraseñas no coinciden."))
         core.proteger(a, destino, op["password"], cancelar=c)
     elif hid == "desproteger":
         r = core.desproteger(a, destino, op["password"], cancelar=c)
         if r.get("restricciones_mantenidas"):
-            return ("Se quitó la contraseña de apertura. El PDF tenía restricciones (por ejemplo, no "
-                    "modificar) y se mantienen: para quitarlas hace falta la contraseña de propietario.")
-        return "Se quitó la contraseña."
+            return T("Se quitó la contraseña de apertura. El PDF tenía restricciones (por ejemplo, no "
+                     "modificar) y se mantienen: para quitarlas hace falta la contraseña de propietario.")
+        return T("Se quitó la contraseña.")
     elif hid == "texto":
         core.pdf_a_texto(a, destino, cancelar=c)
-    return "Listo."
+    return T("Listo.")
 
 
 # =====================================================================
@@ -712,6 +728,7 @@ def circulo_info(d, relleno, color_i):
 
 
 def fuente(tam, negrita=False):
+    """Fuente de la interfaz (cambia según el idioma)."""
     return (FUENTE, tam, "bold") if negrita else (FUENTE, tam)
 
 
@@ -995,7 +1012,7 @@ class Globo:
         caja.pack()
         tk.Label(caja, text=self.texto_fn(), bg=GLOBO, fg=BLANCO, font=fuente(10), justify="left",
                  wraplength=px(380)).pack(anchor="w")
-        tk.Label(caja, text="Clic en el ícono para fijar o cerrar", bg=GLOBO, fg=AZUL_TEXTO_SUAVE,
+        tk.Label(caja, text=T("Clic en el ícono para fijar o cerrar"), bg=GLOBO, fg=AZUL_TEXTO_SUAVE,
                  font=fuente(8)).pack(anchor="w", pady=(px(10), 0))
         self.win.update_idletasks()
         x = self.w.winfo_rootx() + self.w.winfo_width() + px(10)
@@ -1147,7 +1164,7 @@ class VentanaCamara(tk.Toplevel):
         self._tarea = None
         self._esquinas = None       # hoja detectada en la vista (modo escanear)
         self._cuadros = 0
-        self.title(f"Cámara · {APP_NOMBRE}")
+        self.title(T("Cámara") + f" · {APP_NOMBRE}")
         self.configure(bg=FONDO)
         self.minsize(px(640), px(520))
         try:
@@ -1174,35 +1191,35 @@ class VentanaCamara(tk.Toplevel):
 
         barra = tk.Frame(cont, bg=FONDO)
         barra.pack(fill="x", pady=(px(10), 0))
-        tk.Label(barra, text="Cámara", bg=FONDO, fg=TEXTO_SUAVE, font=fuente(9)).pack(side="left")
-        self.var_cam = tk.StringVar(value="Cámara 1")
+        tk.Label(barra, text=T("Cámara"), bg=FONDO, fg=TEXTO_SUAVE, font=fuente(9)).pack(side="left")
+        self.var_cam = tk.StringVar(value=T("Cámara") + " 1")
         combo = ttk.Combobox(barra, textvariable=self.var_cam, state="readonly", width=10,
-                             values=[f"Cámara {i}" for i in range(1, 5)], font=fuente(10),
+                             values=[T("Cámara") + f" {i}" for i in range(1, 5)], font=fuente(10),
                              style="Campo.TCombobox")
         combo.pack(side="left", padx=(px(8), px(10)))
         combo.bind("<<ComboboxSelected>>", lambda e: (combo.selection_clear(), self.abrir()))
-        tk.Label(barra, text="Modo", bg=FONDO, fg=TEXTO_SUAVE, font=fuente(9)).pack(side="left")
+        tk.Label(barra, text=T("Modo"), bg=FONDO, fg=TEXTO_SUAVE, font=fuente(9)).pack(side="left")
         modo = leer_preferencia("ModoCamara", "escanear")
-        self.var_modo = tk.StringVar(value="Foto normal" if modo == "normal" else "Escanear documento")
+        self.var_modo = tk.StringVar(value=T("Foto normal") if modo == "normal" else T("Escanear documento"))
         cmodo = ttk.Combobox(barra, textvariable=self.var_modo, state="readonly", width=18,
-                             values=["Escanear documento", "Foto normal"], font=fuente(10),
+                             values=[T("Escanear documento"), T("Foto normal")], font=fuente(10),
                              style="Campo.TCombobox")
         cmodo.pack(side="left", padx=(px(8), px(10)))
 
         def cambio_modo(e=None):
             cmodo.selection_clear()
             self._esquinas = None
-            guardar_preferencia("ModoCamara", "normal" if self.var_modo.get() == "Foto normal" else "escanear")
+            guardar_preferencia("ModoCamara", "normal" if self.var_modo.get() == T("Foto normal") else "escanear")
         cmodo.bind("<<ComboboxSelected>>", cambio_modo)
-        Boton(barra, "↻  Girar", self.girar, tipo="secundario").pack(side="left")
-        self.btn_listo = Boton(barra, "Listo", self.cerrar, tipo="secundario")
+        Boton(barra, "↻  " + T("Girar"), self.girar, tipo="secundario").pack(side="left")
+        self.btn_listo = Boton(barra, T("Listo"), self.cerrar, tipo="secundario")
         self.btn_listo.pack(side="right")
-        self.btn_foto = Boton(barra, "Sacar foto", self.sacar_foto, grande=True, icono="camara")
+        self.btn_foto = Boton(barra, T("Sacar foto"), self.sacar_foto, grande=True, icono="camara")
         self.btn_foto.pack(side="right", padx=(0, px(10)))
         self.lbl_cuenta = tk.Label(barra, text="", bg=FONDO, fg=TEXTO_SUAVE, font=fuente(10))
         self.lbl_cuenta.pack(side="right", padx=(0, px(14)))
-        tk.Label(cont, text="Escanear documento: la hoja se recorta y endereza sola (borde verde = hoja detectada). "
-                            "Barra espaciadora: sacar foto · Escape: cerrar.",
+        tk.Label(cont, text=T("Escanear documento: la hoja se recorta y endereza sola (borde verde = hoja detectada). "
+                              "Barra espaciadora: sacar foto · Escape: cerrar."),
                  bg=FONDO, fg=TEXTO_SUAVE, font=fuente(8)).pack(anchor="w", pady=(px(8), 0))
         self.bind("<space>", lambda e: (self.sacar_foto(), "break")[1])
         self.bind("<Return>", lambda e: (self.sacar_foto(), "break")[1])
@@ -1224,7 +1241,7 @@ class VentanaCamara(tk.Toplevel):
         if self.cam is not None:
             self.cam.cerrar()
             self.cam = None
-        self._mostrar_texto("Abriendo la cámara…")
+        self._mostrar_texto(T("Abriendo la cámara…"))
         self.btn_foto.habilitar(False)
         indice = int(self.var_cam.get().split()[-1]) - 1
         resultado = queue.Queue()
@@ -1233,13 +1250,13 @@ class VentanaCamara(tk.Toplevel):
             try:
                 resultado.put(("ok", Camara(indice)))
             except ImportError:
-                resultado.put(("error", "Falta el componente de cámara (OpenCV). Reinstalá el programa."))
+                resultado.put(("error", T("Falta el componente de cámara (OpenCV). Reinstalá el programa.")))
             except Exception:
-                resultado.put(("error", "No se pudo abrir la cámara.\n\n"
-                               "Revisá que esté conectada, que no la use otro programa (Teams, Zoom)\n"
-                               "y que Windows permita usarla: Configuración > Privacidad y seguridad >\n"
-                               "Cámara > Permitir que las aplicaciones de escritorio accedan a la cámara.\n\n"
-                               "Si tenés más de una, probá elegir otra en “Cámara”."))
+                resultado.put(("error", T("No se pudo abrir la cámara.\n\n"
+                                          "Revisá que esté conectada, que no la use otro programa (Teams, Zoom)\n"
+                                          "y que Windows permita usarla: Configuración > Privacidad y seguridad >\n"
+                                          "Cámara > Permitir que las aplicaciones de escritorio accedan a la cámara.\n\n"
+                                          "Si tenés más de una, probá elegir otra en “Cámara”.")))
 
         def esperar():
             try:
@@ -1314,7 +1331,7 @@ class VentanaCamara(tk.Toplevel):
         self._tarea = self.after(40, self._refrescar)
 
     def _escanear(self):
-        return self.var_modo.get() != "Foto normal"
+        return self.var_modo.get() != T("Foto normal")
 
     def girar(self):
         self.giro = (self.giro + 90) % 360
@@ -1338,7 +1355,7 @@ class VentanaCamara(tk.Toplevel):
         if not ruta:
             return
         self.n_fotos += 1
-        self.lbl_cuenta.configure(text=f"{self.n_fotos} foto{'s' if self.n_fotos != 1 else ''}")
+        self.lbl_cuenta.configure(text=N(self.n_fotos, "{n} foto", "{n} fotos"))
         # destello blanco: confirma que se sacó la foto
         destello = self.lienzo.create_rectangle(0, 0, self.lienzo.winfo_width(), self.lienzo.winfo_height(),
                                                 fill="#FFFFFF", outline="")
@@ -1501,6 +1518,8 @@ class App(tk.Tk):
         if self.modo_tema not in ("sistema", "claro", "oscuro"):
             self.modo_tema = "sistema"
         aplicar_tema(tema_sistema() if self.modo_tema == "sistema" else self.modo_tema == "oscuro")
+        # idioma: el elegido la última vez; la primera vez, el de Windows
+        aplicar_idioma(leer_preferencia("Idioma", "") or idioma.idioma_de_windows())
         self.title(APP_NOMBRE)
         self.geometry(f"{px(1060)}x{px(720)}")
         self.minsize(px(900), px(680))
@@ -1756,7 +1775,7 @@ class App(tk.Tk):
                          fg=BUSCADOR_TEXTO, insertbackground=BUSCADOR_TEXTO, font=fuente(10),
                          highlightthickness=0, disabledbackground=BUSCADOR)
         campo.pack(side="left", fill="x", expand=True, padx=(px(8), 0))
-        sugerencia = tk.Label(fila, text="Buscar herramienta", bg=BUSCADOR, fg=BUSCADOR_SUGERENCIA,
+        sugerencia = tk.Label(fila, text=T("Buscar herramienta"), bg=BUSCADOR, fg=BUSCADOR_SUGERENCIA,
                               font=fuente(10), cursor="xterm")
         sugerencia.place(in_=campo, x=0, rely=0.5, anchor="w")
         sugerencia.bind("<Button-1>", lambda e: campo.focus_set())
@@ -1843,7 +1862,7 @@ class App(tk.Tk):
         textos.pack(side="left", padx=(px(6), 0))
         tk.Label(textos, text=APP_NOMBRE, bg=LATERAL, fg=BLANCO,
                  font=fuente(14 if compacto else 16, True)).pack(anchor="w")
-        tk.Label(textos, text="DE " + APP_MARCA.upper(), bg=LATERAL, fg=AZUL_TEXTO_SUAVE,
+        tk.Label(textos, text=T("DE {marca}", marca=APP_MARCA.upper()), bg=LATERAL, fg=AZUL_TEXTO_SUAVE,
                  font=fuente(7, True)).pack(anchor="w")
 
         self._buscador(side, compacto)
@@ -1852,13 +1871,13 @@ class App(tk.Tk):
         lista.pack(fill="x", padx=px(12))
         self._pady_item = 0 if compacto else px(1)
         for h in HERRAMIENTAS:
-            it = ItemMenu(lista, h["titulo"], lambda h=h: self.seleccionar(h), ancho - px(24),
+            it = ItemMenu(lista, T(h["titulo"]), lambda h=h: self.seleccionar(h), ancho - px(24),
                           alto=27 if compacto else 33)
             it.pack(pady=self._pady_item)
             it.bind("<Down>", lambda e, h=h: self._mover_menu(h, 1))
             it.bind("<Up>", lambda e, h=h: self._mover_menu(h, -1))
             self.items_menu[h["id"]] = it
-        self._sin_resultados = tk.Label(lista, text="No hay herramientas con ese nombre",
+        self._sin_resultados = tk.Label(lista, text=T("No hay herramientas con ese nombre"),
                                         bg=LATERAL, fg=AZUL_TEXTO_SUAVE, font=fuente(9))
 
         pie_side = tk.Frame(side, bg=LATERAL)
@@ -1869,16 +1888,22 @@ class App(tk.Tk):
             tk.Label(pie_side, image=self._mini_pachelabs, bg=LATERAL, bd=0).pack(side="left", padx=(0, px(6)))
         except Exception:
             pass
-        tk.Label(pie_side, text=f"Versión {APP_VERSION}", bg=LATERAL, fg=PIE_TEXTO,
+        tk.Label(pie_side, text=T("Versión {v}", v=APP_VERSION), bg=LATERAL, fg=PIE_TEXTO,
                  font=fuente(8)).pack(side="left")
         tk.Label(pie_side, text="  ·  ", bg=LATERAL, fg=PIE_TEXTO, font=fuente(8)).pack(side="left")
-        self._enlace_lateral(pie_side, "Acerca de", self.acerca_de).pack(side="left")
+        self._enlace_lateral(pie_side, T("Acerca de"), self.acerca_de).pack(side="left")
         tema = tk.Frame(side, bg=LATERAL)
         tema.pack(side="bottom", fill="x", pady=(0, px(6)), padx=px(20))
-        texto_tema = {"sistema": "◐  Tema: automático (Windows)", "claro": "☀  Tema: claro",
-                      "oscuro": "☾  Tema: oscuro"}[getattr(self, "modo_tema", "sistema")]
+        texto_tema = {"sistema": "◐  " + T("Tema: automático (Windows)"), "claro": "☀  " + T("Tema: claro"),
+                      "oscuro": "☾  " + T("Tema: oscuro")}[getattr(self, "modo_tema", "sistema")]
         self._enlace_lateral(tema, texto_tema, self.cambiar_tema, negrita=False).pack(side="left")
-        tk.Label(side, text="🔒  Sin conexión · tus archivos nunca\n     salen de esta computadora",
+        # idioma: abre un menú con los idiomas disponibles
+        fila_idioma = tk.Frame(side, bg=LATERAL)
+        fila_idioma.pack(side="bottom", fill="x", pady=(0, px(4)), padx=px(20))
+        self._enlace_idioma = self._enlace_lateral(fila_idioma, "🌐  " + T("Idioma") + ": " + idioma.nombre(),
+                                                   lambda: self._menu_idioma(self._enlace_idioma), negrita=False)
+        self._enlace_idioma.pack(side="left")
+        tk.Label(side, text="🔒  " + T("Sin conexión · tus archivos nunca\n     salen de esta computadora"),
                  bg=LATERAL, fg=AZUL_TEXTO_SUAVE, font=fuente(8), justify="left").pack(
             side="bottom", pady=(0, px(4)), padx=px(20), anchor="w")
 
@@ -1886,14 +1911,39 @@ class App(tk.Tk):
     def cambiar_tema(self):
         if self._en_curso:
             try:
-                self.estado.configure(text="Esperá a que termine la operación en curso.", fg=ROJO)
+                self.estado.configure(text=T("Esperá a que termine la operación en curso."), fg=ROJO)
             except Exception:
                 pass
             return
-        # Automático (Windows) → Claro → Oscuro → Automático...
+        # Automático (Windows) → Claro → Oscuro → Automático...  (ver también cambiar_idioma)
         self.modo_tema = {"sistema": "claro", "claro": "oscuro", "oscuro": "sistema"}[self.modo_tema]
         guardar_preferencia("ModoTema", self.modo_tema)
         aplicar_tema(tema_sistema() if self.modo_tema == "sistema" else self.modo_tema == "oscuro")
+        self._reconstruir()
+
+    def _menu_idioma(self, ancla):
+        """Menú desplegable con los idiomas; el elegido se recuerda y la ventana se rearma."""
+        m = tk.Menu(self, tearoff=0, bg=TARJETA, fg=TEXTO, activebackground=BOTON, activeforeground=BLANCO,
+                    font=fuente(10), bd=0)
+        for codigo, nom in idioma.IDIOMAS:
+            m.add_radiobutton(label=nom, value=codigo, variable=tk.StringVar(value=idioma.IDIOMA),
+                              command=lambda c=codigo: self.cambiar_idioma(c))
+        try:
+            m.tk_popup(ancla.winfo_rootx(), ancla.winfo_rooty() - px(26) * len(idioma.IDIOMAS))
+        finally:
+            m.grab_release()
+
+    def cambiar_idioma(self, codigo):
+        if self._en_curso:
+            try:
+                self.estado.configure(text=T("Esperá a que termine la operación en curso."), fg=ROJO)
+            except Exception:
+                pass
+            return
+        if codigo == idioma.IDIOMA:
+            return
+        aplicar_idioma(codigo)
+        guardar_preferencia("Idioma", codigo)
         self._reconstruir()
 
     def _vigilar_tema(self):
@@ -1964,7 +2014,7 @@ class App(tk.Tk):
             return
         win = tk.Toplevel(self)
         self._acerca = win
-        win.title(f"Acerca de {APP_NOMBRE}")
+        win.title(T("Acerca de {app}", app=APP_NOMBRE))
         win.configure(bg=FONDO)
         win.resizable(False, False)
         win.transient(self)
@@ -1980,7 +2030,7 @@ class App(tk.Tk):
         titulos = tk.Frame(cabeza, bg=FONDO)
         titulos.pack(side="left", anchor="n")
         tk.Label(titulos, text=APP_NOMBRE, bg=FONDO, fg=TEXTO, font=fuente(18, True)).pack(anchor="w")
-        tk.Label(titulos, text=f"Versión {APP_VERSION}  ·  Herramientas PDF que funcionan sin conexión",
+        tk.Label(titulos, text=T("Versión {v}", v=APP_VERSION) + "  ·  " + T("Herramientas PDF que funcionan sin conexión"),
                  bg=FONDO, fg=TEXTO_SUAVE, font=fuente(10)).pack(anchor="w", pady=(px(2), 0))
         # sello de Pache Labs (el frasco con lentes) con el nombre
         sello = tk.Frame(cabeza, bg=FONDO)
@@ -1996,16 +2046,16 @@ class App(tk.Tk):
         for parte, color in (("Pache", TEXTO), (".", BOTON), ("Labs", TEXTO)):
             tk.Label(nombre, text=parte, bg=FONDO, fg=color, font=fuente(13, True), bd=0, padx=0).pack(side="left")
         filas = [
-            ("Hecho por", "Nicolás Emanuel Pacheco (Pache), " + APP_MARCA),
-            ("Licencia", "Gratis y de código abierto (GNU AGPL-3.0). Se entrega sin garantía; "
-                         "el texto completo está en LICENSE.txt."),
-            ("Código fuente", "Disponible para cada versión en la página del proyecto."),
-            ("Contacto", "pache.labs@gmail.com: errores, ideas y sugerencias."),
-            ("Componentes", "PyMuPDF / MuPDF (AGPL-3.0) · Pillow (MIT-CMU) · OpenCV (Apache-2.0) · "
-                            "NumPy (BSD) · tkinterdnd2 (MIT) · Python (PSF) · Tcl/Tk (BSD)"),
-            ("Privacidad", "No usa internet. Ojo: si guardás en una carpeta sincronizada con OneDrive, "
-                           "OneDrive sí la sube a la nube."),
-            ("Compilación", texto_modo_compilacion()),
+            (T("Hecho por"), "Nicolás Emanuel Pacheco (Pache), " + APP_MARCA),
+            (T("Licencia"), T("Gratis y de código abierto (GNU AGPL-3.0). Se entrega sin garantía; "
+                              "el texto completo está en LICENSE.txt.")),
+            (T("Código fuente"), T("Disponible para cada versión en la página del proyecto.")),
+            (T("Contacto"), "pache.labs@gmail.com: " + T("errores, ideas y sugerencias.")),
+            (T("Componentes"), "PyMuPDF / MuPDF (AGPL-3.0) · Pillow (MIT-CMU) · OpenCV (Apache-2.0) · "
+                               "NumPy (BSD) · tkinterdnd2 (MIT) · Python (PSF) · Tcl/Tk (BSD)"),
+            (T("Privacidad"), T("No usa internet. Ojo: si guardás en una carpeta sincronizada con OneDrive, "
+                                "OneDrive sí la sube a la nube.")),
+            (T("Compilación"), texto_modo_compilacion()),
         ]
         tabla = tk.Frame(caja, bg=FONDO)
         tabla.pack(fill="x")
@@ -2016,13 +2066,13 @@ class App(tk.Tk):
                      wraplength=px(400)).grid(row=i, column=1, sticky="w", pady=px(4))
         botones = tk.Frame(caja, bg=FONDO)
         botones.pack(fill="x", pady=(px(18), 0))
-        Boton(botones, "Cerrar", win.destroy).pack(side="right")
+        Boton(botones, T("Cerrar"), win.destroy).pack(side="right")
         # abre la página de Cafecito en el navegador (el programa en sí no se conecta)
-        Boton(botones, "☕  Invitame un cafecito", lambda: abrir_archivo("https://cafecito.app/pachelabs"),
+        Boton(botones, "☕  " + T("Invitame un cafecito"), lambda: abrir_archivo("https://cafecito.app/pachelabs"),
               tipo="secundario").pack(side="left")
-        Boton(botones, "Licencia", lambda: abrir_archivo(archivo_base("LICENSE.txt")),
+        Boton(botones, T("Licencia"), lambda: abrir_archivo(archivo_base("LICENSE.txt")),
               tipo="secundario").pack(side="right", padx=(0, px(10)))
-        Boton(botones, "Licencias de terceros", lambda: abrir_archivo(archivo_base("LICENCIAS_TERCEROS.txt")),
+        Boton(botones, T("Licencias de terceros"), lambda: abrir_archivo(archivo_base("LICENCIAS_TERCEROS.txt")),
               tipo="secundario").pack(side="right", padx=(0, px(10)))
         win.update_idletasks()
         x = self.winfo_rootx() + (self.winfo_width() - win.winfo_width()) // 2
@@ -2036,7 +2086,7 @@ class App(tk.Tk):
         if self._en_curso:
             # una operación a la vez: no se cambia de herramienta hasta que termine
             try:
-                self.estado.configure(text="Esperá a que termine la operación en curso.", fg=ROJO)
+                self.estado.configure(text=T("Esperá a que termine la operación en curso."), fg=ROJO)
             except Exception:
                 pass
             return
@@ -2063,22 +2113,23 @@ class App(tk.Tk):
         # título + ícono de información
         cab = tk.Frame(cont, bg=FONDO)
         cab.pack(anchor="w", fill="x")
-        tk.Label(cab, text=h["titulo"], bg=FONDO, fg=TEXTO, font=fuente(20, True)).pack(side="left")
+        tk.Label(cab, text=T(h["titulo"]), bg=FONDO, fg=TEXTO, font=fuente(20, True)).pack(side="left")
         d = px(22)
         info = tk.Label(cab, image=circulo_info(d, INFO_FONDO, AZUL), bg=FONDO, bd=0, cursor="hand2")
         info.pack(side="left", padx=(px(12), 0), pady=(px(4), 0))
-        self.globo = Globo(info, lambda: AYUDA.get(h["id"], h["desc"]))
+        self.globo = Globo(info, lambda: T(AYUDA.get(h["id"], h["desc"])))
         # re-enganchar el hover del color después de que Globo definió los suyos
         info.bind("<Enter>", lambda e: info.configure(image=circulo_info(d, BOTON, BLANCO)), add="+")
         info.bind("<Leave>", lambda e: info.configure(image=circulo_info(d, INFO_FONDO, AZUL)), add="+")
         opciones = tk.Frame(cab, bg=FONDO)
         opciones.pack(side="right", pady=(px(6), 0))
-        Casilla(opciones, "Limpiar la lista al terminar", self.pref_limpiar,
+        Casilla(opciones, T("Limpiar la lista al terminar"), self.pref_limpiar,
                 lambda v: self._cambiar_pref("limpiar", v)).pack(side="right", padx=(px(14), 0))
-        Casilla(opciones, "Abrir al terminar", self.pref_abrir,
+        Casilla(opciones, T("Abrir al terminar"), self.pref_abrir,
                 lambda v: self._cambiar_pref("abrir", v)).pack(side="right")
 
-        tk.Label(cont, text=h["desc"], bg=FONDO, fg=TEXTO_SUAVE, font=fuente(10)).pack(anchor="w", pady=(px(2), px(16)))
+        tk.Label(cont, text=T(h["desc"]), bg=FONDO, fg=TEXTO_SUAVE, font=fuente(10), justify="left",
+                 wraplength=px(700)).pack(anchor="w", pady=(px(2), px(16)))
 
         multi = h["entrada"] in ("multi", "imagenes")
 
@@ -2088,11 +2139,11 @@ class App(tk.Tk):
         card.pack(fill="both", expand=multi)
         barra = tk.Frame(card, bg=TARJETA)
         barra.pack(fill="x", padx=px(18), pady=(px(16), px(10)))
-        txt = {"multi": "＋  Agregar PDF", "pdf": "Elegir PDF", "imagenes": "＋  Agregar imágenes"}[h["entrada"]]
-        self.btn_agregar = Boton(barra, "Abrir cámara" if h.get("camara") else txt, self.agregar,
+        txt = {"multi": "＋  " + T("Agregar PDF"), "pdf": T("Elegir PDF"), "imagenes": "＋  " + T("Agregar imágenes")}[h["entrada"]]
+        self.btn_agregar = Boton(barra, T("Abrir cámara") if h.get("camara") else txt, self.agregar,
                                  bg_padre=TARJETA, icono="camara" if h.get("camara") else None)
         self.btn_agregar.pack(side="left")
-        self.btn_limpiar = Boton(barra, "Quitar todos", self.limpiar, tipo="secundario", bg_padre=TARJETA)
+        self.btn_limpiar = Boton(barra, T("Quitar todos"), self.limpiar, tipo="secundario", bg_padre=TARJETA)
         self.lbl_cuenta = tk.Label(barra, text="", bg=TARJETA, fg=TEXTO_SUAVE, font=fuente(9))
         self.lbl_cuenta.pack(side="right")
         tk.Frame(card, bg=SEPARADOR, height=1).pack(fill="x", padx=px(18))
@@ -2114,6 +2165,7 @@ class App(tk.Tk):
 
         # --- opciones ---
         self.vars = {}
+        self._inverso = {}   # por opción: texto mostrado (traducido) -> valor interno en español
         if h["opciones"]:
             op = Tarjeta(cont)
             op.pack(fill="x", pady=(px(14), 0))
@@ -2124,9 +2176,14 @@ class App(tk.Tk):
                 celda = tk.Frame(grid, bg=TARJETA)
                 celda.grid(row=fila, column=col, sticky="ew", padx=(0 if col == 0 else px(18), 0), pady=px(5))
                 grid.columnconfigure(col, weight=1, uniform="op")
-                tk.Label(celda, text=etiqueta, bg=TARJETA, fg=TEXTO_SUAVE, font=fuente(9)).pack(anchor="w", pady=(0, px(4)))
+                tk.Label(celda, text=T(etiqueta), bg=TARJETA, fg=TEXTO_SUAVE, font=fuente(9), justify="left",
+                         wraplength=px(330)).pack(anchor="w", pady=(0, px(4)))
                 campo = Tarjeta(celda, relleno=CAMPO, borde=BORDE, radio=px(8), bg_padre=TARJETA)
                 campo.pack(fill="x")
+                if tipo == "combo":
+                    self._inverso[clave] = {T(x): x for x in valores}
+                    valores = [T(x) for x in valores]
+                    defecto = T(defecto)
                 v = tk.StringVar(value=defecto)
                 if tipo == "combo":
                     w = ttk.Combobox(campo, textvariable=v, values=valores, state="readonly",
@@ -2134,7 +2191,7 @@ class App(tk.Tk):
                     w.pack(fill="x", padx=(px(8), px(6)), pady=px(5))
                     w.bind("<<ComboboxSelected>>", lambda e, w=w: w.selection_clear())
                     if h["id"] == "dividir" and clave == "modo":
-                        ejemplos = {"Cada N páginas": "1", "Por rangos": "1-3,4-", "Por tamaño (MB)": "25"}
+                        ejemplos = {T("Cada N páginas"): "1", T("Por rangos"): "1-3,4-", T("Por tamaño (MB)"): "25"}
                         w.bind("<<ComboboxSelected>>",
                                lambda e, v=v: self.vars["valor"].set(ejemplos.get(v.get(), "")), add="+")
                 else:
@@ -2148,9 +2205,9 @@ class App(tk.Tk):
         # --- acción ---
         pie = tk.Frame(cont, bg=FONDO)
         pie.pack(fill="x", side="bottom" if not multi else "top", pady=(px(16), 0))
-        self.btn_ejecutar = Boton(pie, h["titulo"], self.procesar, grande=True)
+        self.btn_ejecutar = Boton(pie, T(h["titulo"]), self.procesar, grande=True)
         self.btn_ejecutar.pack(side="right")
-        self.btn_abrir = Boton(pie, "Abrir carpeta", self.abrir_destino, tipo="secundario")
+        self.btn_abrir = Boton(pie, T("Abrir carpeta"), self.abrir_destino, tipo="secundario")
         self._apoyo(pie)
         self.estado = tk.Label(pie, text="", bg=FONDO, fg=TEXTO_SUAVE, font=fuente(10), anchor="w",
                                justify="left", wraplength=px(330), width=1)
@@ -2165,7 +2222,7 @@ class App(tk.Tk):
         Solo abre la página en el navegador: el programa en sí no se conecta a internet."""
         caja = tk.Frame(pie, bg=FONDO)
         caja.pack(side="left", padx=(0, px(16)))
-        tk.Label(caja, text="¿Te sirvió? Apoyá a Pache Labs", bg=FONDO, fg=TEXTO_SUAVE,
+        tk.Label(caja, text=T("¿Te sirvió? Apoyá a Pache Labs"), bg=FONDO, fg=TEXTO_SUAVE,
                  font=fuente(9), anchor="w").pack(anchor="w")
         enlaces = tk.Frame(caja, bg=FONDO)
         enlaces.pack(anchor="w", pady=(px(2), 0))
@@ -2228,13 +2285,13 @@ class App(tk.Tk):
         for i, f in enumerate(self.archivos):
             self._fila(i, f, multi)
 
-        self.lbl_cuenta.configure(text=(f"{n} archivo" + ("s" if n != 1 else "")) if multi and n else "")
+        self.lbl_cuenta.configure(text=N(n, "{n} archivo", "{n} archivos") if multi and n else "")
         if multi and n:
             self.btn_limpiar.pack(side="left", padx=(px(10), 0))
         else:
             self.btn_limpiar.pack_forget()
         if not multi:
-            self.btn_agregar.set_texto("Cambiar PDF" if n else "Elegir PDF")
+            self.btn_agregar.set_texto(T("Cambiar PDF") if n else T("Elegir PDF"))
         self.lienzo.yview_moveto(0)
         self._preparar_soltar()
 
@@ -2277,18 +2334,19 @@ class App(tk.Tk):
                           arrowshape=(px(9), px(10), px(4)))
             z.create_line(cx - px(15), cy - px(8), cx - px(15), cy + px(4), cx + px(15), cy + px(4),
                           cx + px(15), cy - px(8), fill=ic, width=px(2), joinstyle="round", capstyle="round")
-        boton = {"multi": "Agregar PDF", "pdf": "Elegir PDF", "imagenes": "Agregar imágenes"}[h["entrada"]]
-        tipo = "imágenes" if h["entrada"] == "imagenes" else ("PDF" if h["entrada"] == "multi" else "PDF")
+        boton = {"multi": T("Agregar PDF"), "pdf": T("Elegir PDF"), "imagenes": T("Agregar imágenes")}[h["entrada"]]
         if activo:
-            principal, segunda = "Soltá para agregarlos", ""
+            principal, segunda = T("Soltá para agregarlos"), ""
         elif h.get("camara"):
-            principal = "Hacé clic para abrir la cámara"
-            segunda = "También podés arrastrar fotos que ya tengas" if self.dnd else ""
+            principal = T("Hacé clic para abrir la cámara")
+            segunda = T("También podés arrastrar fotos que ya tengas") if self.dnd else ""
         elif self.dnd:
-            principal = f"Arrastrá tus {tipo} acá" if h["entrada"] != "pdf" else "Arrastrá tu PDF acá"
-            segunda = "o hacé clic para buscarlos" if h["entrada"] != "pdf" else "o hacé clic para buscarlo"
+            principal = {"imagenes": T("Arrastrá tus imágenes acá"), "multi": T("Arrastrá tus PDF acá")}.get(
+                h["entrada"], T("Arrastrá tu PDF acá"))
+            segunda = T("o hacé clic para buscarlos") if h["entrada"] != "pdf" else T("o hacé clic para buscarlo")
         else:
-            principal, segunda = "Todavía no elegiste archivos", f"Usá el botón \u201c{boton}\u201d para empezar"
+            principal = T("Todavía no elegiste archivos")
+            segunda = T("Usá el botón \u201c{boton}\u201d para empezar", boton=boton)
         z.create_text(cx, cy + px(26), text=principal, fill=AZUL if activo else TEXTO, font=fuente(11, True))
         if segunda:
             z.create_text(cx, cy + px(46), text=segunda, fill=TEXTO_SUAVE, font=fuente(9))
@@ -2369,15 +2427,16 @@ class App(tk.Tk):
             if validas:
                 self.archivos = [validas[0]]
                 if len(validas) > 1:
-                    avisos.append("Esta herramienta usa un PDF a la vez: se tomó el primero.")
+                    avisos.append(T("Esta herramienta usa un PDF a la vez: se tomó el primero."))
         else:
             self.archivos.extend(v for v in validas if v not in self.archivos)
         if ignoradas:
-            tipo = ("imágenes" if ignoradas != 1 else "una imagen") if imagenes else "PDF"
-            if ignoradas == 1:
-                avisos.append(f"Se ignoró 1 archivo que no es {tipo}.")
+            if imagenes:
+                avisos.append(N(ignoradas, "Se ignoró {n} archivo que no es una imagen.",
+                                "Se ignoraron {n} archivos que no son imágenes."))
             else:
-                avisos.append(f"Se ignoraron {ignoradas} archivos que no son {tipo}.")
+                avisos.append(N(ignoradas, "Se ignoró {n} archivo que no es PDF.",
+                                "Se ignoraron {n} archivos que no son PDF."))
         self._refrescar_lista()
         if hasattr(self, "estado"):
             self.estado.configure(text="  ".join(avisos), fg=TEXTO_SUAVE)
@@ -2410,12 +2469,12 @@ class App(tk.Tk):
                 inf = self._info(f)
                 if inf is None:
                     raise ValueError
-                meta = f"{inf['paginas']} página{'s' if inf['paginas'] != 1 else ''}  ·  {meta}" + \
-                       {"clave": "  ·  🔒 con contraseña", "restringido": "  ·  🔒 con restricciones"}.get(
-                           inf["seguridad"], "") + {"valida": "  ·  con firma digital",
-                            "alterada": "  ·  firma digital NO válida (copia modificada)"}.get(inf.get("firma"), "")
+                meta = N(inf['paginas'], "{n} página", "{n} páginas") + f"  ·  {meta}" + \
+                       {"clave": "  ·  🔒 " + T("con contraseña"), "restringido": "  ·  🔒 " + T("con restricciones")}.get(
+                           inf["seguridad"], "") + {"valida": "  ·  " + T("con firma digital"),
+                            "alterada": "  ·  " + T("firma digital NO válida (copia modificada)")}.get(inf.get("firma"), "")
         except Exception:
-            meta = "No se pudo leer el archivo"
+            meta = T("No se pudo leer el archivo")
         tk.Label(textos, text=os.path.basename(f), bg=TARJETA, fg=TEXTO, font=fuente(10, True),
                  anchor="w").pack(fill="x")
         tk.Label(textos, text=meta, bg=TARJETA, fg=TEXTO_SUAVE, font=fuente(9), anchor="w").pack(fill="x")
@@ -2548,7 +2607,7 @@ class App(tk.Tk):
         """Durante una operación no se toca la lista (evita abrir PDF desde dos hilos a la vez)."""
         if self._en_curso:
             try:
-                self.estado.configure(text="Esperá a que termine la operación en curso.", fg=ROJO)
+                self.estado.configure(text=T("Esperá a que termine la operación en curso."), fg=ROJO)
             except Exception:
                 pass
             return True
@@ -2562,14 +2621,14 @@ class App(tk.Tk):
             self.abrir_camara()
             return
         if h["entrada"] == "imagenes":
-            tipos = [("Imágenes", "*.jpg *.jpeg *.png *.bmp *.tif *.tiff *.webp")]
+            tipos = [(T("Imágenes"), "*.jpg *.jpeg *.png *.bmp *.tif *.tiff *.webp")]
         else:
-            tipos = [("Archivos PDF", "*.pdf")]
+            tipos = [(T("Archivos PDF"), "*.pdf")]
         if h["entrada"] == "pdf":
-            f = filedialog.askopenfilename(title="Elegir PDF", filetypes=tipos)
+            f = filedialog.askopenfilename(title=T("Elegir PDF"), filetypes=tipos)
             elegidos = [f] if f else []
         else:
-            elegidos = list(filedialog.askopenfilenames(title="Agregar archivos", filetypes=tipos))
+            elegidos = list(filedialog.askopenfilenames(title=T("Agregar archivos"), filetypes=tipos))
         if elegidos:
             # mismo filtro que al arrastrar: se ignoran (con aviso) los de otro tipo
             self._agregar_rutas(elegidos)
@@ -2646,7 +2705,7 @@ class App(tk.Tk):
             ruta = os.path.join(self._dir_fotos, f"Foto {self._n_foto:03d}.jpg")
             img.convert("RGB").save(ruta, format="JPEG", quality=92)
         except OSError as e:
-            messagebox.showerror(APP_NOMBRE, f"No se pudo guardar la foto:\n\n{traducir_error(e)}")
+            messagebox.showerror(APP_NOMBRE, T("No se pudo guardar la foto:") + "\n\n" + traducir_error(e))
             return None
         if self.herr_actual and self.herr_actual.get("camara"):
             self.archivos.append(ruta)
@@ -2674,15 +2733,15 @@ class App(tk.Tk):
             carpeta = docs if os.path.isdir(docs) else os.path.expanduser("~")
             base = time.strftime("Fotos_%Y-%m-%d_%H%M")
         if h["salida"] == "carpeta":
-            d = filedialog.askdirectory(title="Elegí dónde guardar", initialdir=carpeta)
+            d = filedialog.askdirectory(title=T("Elegí dónde guardar"), initialdir=carpeta)
             return os.path.join(d, f"{base}_{h['id']}") if d else None
         if h["salida"] == "txt":
-            return filedialog.asksaveasfilename(title="Guardar como", initialdir=carpeta,
+            return filedialog.asksaveasfilename(title=T("Guardar como"), initialdir=carpeta,
                                                 initialfile=f"{base}.txt", defaultextension=".txt",
-                                                filetypes=[("Texto", "*.txt")])
-        return filedialog.asksaveasfilename(title="Guardar como", initialdir=carpeta,
-                                            initialfile=f"{base}{h.get('sufijo', '')}.pdf",
-                                            defaultextension=".pdf", filetypes=[("Archivos PDF", "*.pdf")])
+                                                filetypes=[(T("Texto"), "*.txt")])
+        return filedialog.asksaveasfilename(title=T("Guardar como"), initialdir=carpeta,
+                                            initialfile=f"{base}{T(h.get('sufijo', '')) if h.get('sufijo') else ''}.pdf",
+                                            defaultextension=".pdf", filetypes=[(T("Archivos PDF"), "*.pdf")])
 
     def procesar(self):
         if self._en_curso:
@@ -2691,12 +2750,12 @@ class App(tk.Tk):
         # se trabaja sobre una copia: lo que se revisa es exactamente lo que se procesa
         archivos = list(self.archivos)
         if not archivos:
-            messagebox.showinfo(APP_NOMBRE, "Primero elegí los archivos.")
+            messagebox.showinfo(APP_NOMBRE, T("Primero elegí los archivos."))
             return
         if h["id"] == "unir" and len(archivos) < 2:
-            messagebox.showinfo(APP_NOMBRE, "Agregá al menos dos PDF para unir.")
+            messagebox.showinfo(APP_NOMBRE, T("Agregá al menos dos PDF para unir."))
             return
-        opciones = {k: v.get() for k, v in self.vars.items()}
+        opciones = {k: self._inverso.get(k, {}).get(v.get(), v.get()) for k, v in self.vars.items()}
         try:
             confirmar = self._validar(h, archivos, opciones)
         except ValueError as e:
@@ -2708,13 +2767,13 @@ class App(tk.Tk):
         if not destino:
             return
         if any(mismo_archivo(destino, a) for a in archivos):
-            messagebox.showwarning(APP_NOMBRE, "Elegí un nombre distinto al archivo original.")
+            messagebox.showwarning(APP_NOMBRE, T("Elegí un nombre distinto al archivo original."))
             return
         od = carpeta_onedrive(destino)
         if od and not messagebox.askyesno(
-                APP_NOMBRE, "La carpeta elegida está sincronizada con OneDrive:\n" + od +
-                "\n\nOneDrive va a subir el resultado a la nube. Ozone PDF no usa internet, pero OneDrive sí."
-                "\n\n¿Querés guardar ahí igual?"):
+                APP_NOMBRE, T("La carpeta elegida está sincronizada con OneDrive:") + "\n" + od + "\n\n" +
+                T("OneDrive va a subir el resultado a la nube. Ozone PDF no usa internet, pero OneDrive sí.") +
+                "\n\n" + T("¿Querés guardar ahí igual?")):
             return
         if h["salida"] == "carpeta":
             destino = carpeta_libre(destino)
@@ -2736,14 +2795,14 @@ class App(tk.Tk):
                     ocultar(parcial)  # mientras se genera no se ve en el Explorador
                 msg = ejecutar(h, archivos, parcial, opciones, cancelar=self._evento_cancelar)
                 if self._cancelar:
-                    raise core.Cancelado("Operación cancelada.")
+                    raise core.Cancelado(T("Operación cancelada."))
                 os.replace(parcial, destino)
                 if h["salida"] == "carpeta":
                     ocultar(destino, False)
                 terminado = True
                 resultado.put(("ok", msg, destino))
             except core.Cancelado:
-                resultado.put(("info", "Operación cancelada.", None))
+                resultado.put(("info", T("Operación cancelada."), None))
             except core.SinCambios as e:
                 resultado.put(("info", str(e), None))
             except Exception as e:
@@ -2802,17 +2861,17 @@ class App(tk.Tk):
         permite esa lectura. Cifrado sin restricciones: se procesa como uno normal."""
         nombre = os.path.basename(ruta)
         if inf["seguridad"] == "clave":
-            raise ValueError(f"\u201c{nombre}\u201d tiene contraseña para abrirse.\n\n"
-                             "Quitala primero con \u201cQuitar contraseña\u201d.")
+            raise ValueError(T("\u201c{nombre}\u201d tiene contraseña para abrirse.\n\n"
+                               "Quitala primero con \u201cQuitar contraseña\u201d.", nombre=nombre))
         if inf["seguridad"] == "restringido":
             permiso = SOLO_LECTURA.get(hid)
             if permiso and inf["permisos"] & permiso:
                 return
-            que = {core.pymupdf.PDF_PERM_COPY: "copiar el texto",
-                   core.pymupdf.PDF_PERM_PRINT: "imprimir"}.get(permiso, "modificarlo")
-            raise ValueError(f"\u201c{nombre}\u201d tiene restricciones de seguridad que no permiten {que}.\n\n"
-                             "Para quitarlas hace falta la contraseña de propietario "
-                             "(herramienta \u201cQuitar contraseña\u201d).")
+            que = {core.pymupdf.PDF_PERM_COPY: T("copiar el texto"),
+                   core.pymupdf.PDF_PERM_PRINT: T("imprimir")}.get(permiso, T("modificarlo"))
+            raise ValueError(T("\u201c{nombre}\u201d tiene restricciones de seguridad que no permiten {que}.\n\n"
+                               "Para quitarlas hace falta la contraseña de propietario "
+                               "(herramienta \u201cQuitar contraseña\u201d).", nombre=nombre, que=que))
 
     def _validar(self, h, archivos, op):
         """Revisa todo antes de empezar. Lanza ValueError con un mensaje claro o devuelve
@@ -2823,51 +2882,53 @@ class App(tk.Tk):
         for a in pdfs:
             inf = self._info(a)
             if inf is None:
-                raise ValueError(f"No se pudo abrir \u201c{os.path.basename(a)}\u201d. "
-                                 "Verificá que sea un PDF válido y que no esté abierto en otro programa.")
+                raise ValueError(T("No se pudo abrir \u201c{nombre}\u201d. "
+                                   "Verificá que sea un PDF válido y que no esté abierto en otro programa.",
+                                   nombre=os.path.basename(a)))
             infos[a] = inf
             if hid != "desproteger":
                 self._revisar_seguridad(hid, a, inf)
         if hid == "desproteger" and pdfs and not infos[pdfs[0]]["cifrado"]:
-            raise ValueError("Este PDF no tiene contraseña.")
+            raise ValueError(T("Este PDF no tiene contraseña."))
         total = infos[pdfs[0]]["paginas"] if pdfs else 0
         confirmaciones = []
         firmados = [os.path.basename(a) for a, inf in infos.items() if inf.get("firma") == "valida"]
         alterados = [os.path.basename(a) for a, inf in infos.items() if inf.get("firma") == "alterada"]
         if alterados and not firmados and hid not in SOLO_LECTURA:
-            cual = (f"\u201c{alterados[0]}\u201d tiene" if len(alterados) == 1
-                    else f"{len(alterados)} de los PDF tienen")
-            confirmaciones.append(
-                f"{cual} una firma digital que YA NO ES VÁLIDA: el archivo fue modificado después "
+            cual = (T("\u201c{nombre}\u201d tiene", nombre=alterados[0]) if len(alterados) == 1
+                    else T("{n} de los PDF tienen", n=len(alterados)))
+            confirmaciones.append(T(
+                "{cual} una firma digital que YA NO ES VÁLIDA: el archivo fue modificado después "
                 "de firmarse (por ejemplo, es una copia unida o comprimida). Aunque se vea el sello "
-                "de la firma, no sirve como documento firmado; tampoco la copia que se genere ahora.")
+                "de la firma, no sirve como documento firmado; tampoco la copia que se genere ahora.", cual=cual))
         if firmados and hid not in SOLO_LECTURA:
-            cual = (f"\u201c{firmados[0]}\u201d tiene" if len(firmados) == 1
-                    else f"{len(firmados)} de los PDF tienen")
-            confirmaciones.append(
-                f"{cual} FIRMA DIGITAL.\n\nEl archivo que se genere NO va a tener una firma válida: "
+            cual = (T("\u201c{nombre}\u201d tiene", nombre=firmados[0]) if len(firmados) == 1
+                    else T("{n} de los PDF tienen", n=len(firmados)))
+            confirmaciones.append(T(
+                "{cual} FIRMA DIGITAL.\n\nEl archivo que se genere NO va a tener una firma válida: "
                 "cualquier cambio la invalida (en Acrobat aparece como alterada) y al unir o extraer "
                 "páginas se pierde.\n\nEl original no se modifica y sigue firmado: para trámites o "
-                "para enviar como documento firmado, usá siempre el original.")
+                "para enviar como documento firmado, usá siempre el original.", cual=cual))
         adjuntos = sum(inf.get("adjuntos", 0) for inf in infos.values())
         if adjuntos and hid != "desproteger":
             confirmaciones.append(
-                f"El PDF tiene {adjuntos} archivo{'s' if adjuntos != 1 else ''} adjunto{'s' if adjuntos != 1 else ''}. "
-                "Ozone PDF genera las copias sin adjuntos y sin el nombre del autor de las notas, para no "
-                "arrastrar datos personales.")
+                N(adjuntos, "El PDF tiene {n} archivo adjunto.", "El PDF tiene {n} archivos adjuntos.") + " " +
+                T("Ozone PDF genera las copias sin adjuntos y sin el nombre del autor de las notas, para no "
+                  "arrastrar datos personales."))
         respuestas = sum(inf.get("respuestas", 0) for inf in infos.values())
         if respuestas and hid in ("unir", "dividir"):
             confirmaciones.append(
-                f"El PDF tiene {respuestas} respuesta{'s' if respuestas != 1 else ''} a comentarios. "
-                f"{'Unir' if hid == 'unir' else 'Dividir'} arma un PDF nuevo y las respuestas no se copian "
-                "(los comentarios originales sí). El original no se modifica.")
+                N(respuestas, "El PDF tiene {n} respuesta a comentarios.", "El PDF tiene {n} respuestas a comentarios.")
+                + " " + T("{herramienta} arma un PDF nuevo y las respuestas no se copian "
+                          "(los comentarios originales sí). El original no se modifica.",
+                          herramienta=T("Unir PDF") if hid == "unir" else T("Dividir PDF")))
         if hid == "proteger":
             if not op["password"]:
-                raise ValueError("Escribí una contraseña.")
+                raise ValueError(T("Escribí una contraseña."))
             if op["password"] != op["password2"]:
-                raise ValueError("Las contraseñas no coinciden.")
+                raise ValueError(T("Las contraseñas no coinciden."))
             if len(op["password"]) < 6:
-                confirmaciones.append("La contraseña tiene menos de 6 caracteres y es fácil de adivinar.")
+                confirmaciones.append(T("La contraseña tiene menos de 6 caracteres y es fácil de adivinar."))
         if hid == "dividir":
             if op["modo"].startswith("Por tamaño"):
                 try:
@@ -2875,48 +2936,50 @@ class App(tk.Tk):
                 except ValueError:
                     mb = 0
                 if mb <= 0:
-                    raise ValueError("Indicá el tamaño máximo de cada parte en MB, por ejemplo 25 (o 9,5).")
+                    raise ValueError(T("Indicá el tamaño máximo de cada parte en MB, por ejemplo 25 (o 9,5)."))
             elif op["modo"].startswith("Cada"):
                 try:
                     n = int(op["valor"].strip())
                 except ValueError:
                     n = 0
                 if n < 1:
-                    raise ValueError("Indicá cada cuántas páginas dividir con un número entero, por ejemplo 2.")
+                    raise ValueError(T("Indicá cada cuántas páginas dividir con un número entero, por ejemplo 2."))
             else:
                 if not op["valor"].strip():
-                    raise ValueError("Indicá los rangos, por ejemplo: 1-3,4-8,9-")
+                    raise ValueError(T("Indicá los rangos, por ejemplo: 1-3,4-8,9-"))
                 for r in op["valor"].split(","):
                     if r.strip():
                         core.parse_rango(r, total)
         elif hid in ("extraer", "eliminar", "rotar") and op.get("rango", "").strip():
             core.parse_rango(op["rango"], total)
         elif hid == "eliminar" and not op.get("rango", "").strip():
-            raise ValueError("Indicá qué páginas eliminar, por ejemplo: 2,4-6")
+            raise ValueError(T("Indicá qué páginas eliminar, por ejemplo: 2,4-6"))
         if hid == "eliminar" and op.get("rango", "").strip() and total:
             if len(set(core.parse_rango(op["rango"], total))) >= total:
-                raise ValueError("No se pueden eliminar todas las páginas: el PDF quedaría vacío.")
+                raise ValueError(T("No se pueden eliminar todas las páginas: el PDF quedaría vacío."))
         elif hid == "reordenar":
             if not op["orden"].strip():
-                raise ValueError("Indicá el nuevo orden de páginas, por ejemplo: 3,1,2,4-")
+                raise ValueError(T("Indicá el nuevo orden de páginas, por ejemplo: 3,1,2,4-"))
             paginas = core.parse_rango(op["orden"], total)
             faltan = total - len(set(paginas))
             if faltan > 0:
-                confirmaciones.append(f"El nuevo orden no incluye {faltan} página{'s' if faltan != 1 else ''} "
-                                      "del documento: se van a descartar del archivo final.")
+                confirmaciones.append(N(faltan, "El nuevo orden no incluye {n} página del documento: se va a "
+                                                "descartar del archivo final.",
+                                        "El nuevo orden no incluye {n} páginas del documento: se van a "
+                                        "descartar del archivo final."))
         elif hid == "numerar":
             try:
                 inicio = int(op["inicio"].strip())
             except ValueError:
                 inicio = 0
             if inicio < 1:
-                raise ValueError("\u201cEmpezar en\u201d tiene que ser un número entero de 1 en adelante, "
-                                 "por ejemplo 1 o 21.")
+                raise ValueError(T("\u201cEmpezar en\u201d tiene que ser un número entero de 1 en adelante, "
+                                   "por ejemplo 1 o 21."))
             core.validar_formato_numeracion(op["formato"])
         elif hid == "marca" and not op["texto"].strip():
-            raise ValueError("Escribí el texto de la marca de agua.")
+            raise ValueError(T("Escribí el texto de la marca de agua."))
         if confirmaciones:
-            return "\n\n".join(confirmaciones) + "\n\n¿Querés continuar?"
+            return "\n\n".join(confirmaciones) + "\n\n" + T("¿Querés continuar?")
         return None
 
     def _al_cerrar(self):
@@ -2927,23 +2990,23 @@ class App(tk.Tk):
             return
         if self._cancelar:  # ya se pidió: se está terminando el paso actual
             return
-        if messagebox.askyesno(APP_NOMBRE, "Hay una operación en curso.\n\n¿Querés cancelarla y salir? "
-                                           "Se detiene en la página que está procesando y el archivo "
-                                           "a medio generar se descarta."):
+        if messagebox.askyesno(APP_NOMBRE, T("Hay una operación en curso.\n\n¿Querés cancelarla y salir? "
+                                             "Se detiene en la página que está procesando y el archivo "
+                                             "a medio generar se descarta.")):
             # se espera a que el hilo de trabajo termine su paso actual; al terminar ve el
             # pedido de cancelación, borra el parcial y la ventana se cierra sola
             self._cancelar = True
             self._evento_cancelar.set()  # el motor se detiene en la próxima página
             # la ventana queda visible hasta que el proceso realmente termine: algunos pasos
             # (recomprimir imágenes, guardar) los hace MuPDF de una vez y no se pueden cortar
-            self.estado.configure(text="Cancelando… se termina el paso actual y la ventana se cierra sola.",
+            self.estado.configure(text=T("Cancelando… se termina el paso actual y la ventana se cierra sola."),
                                   fg=TEXTO_SUAVE)
 
     def _ocupado(self, si):
         self.btn_ejecutar.habilitar(not si)
         self.btn_abrir.pack_forget()
         if si:
-            self.estado.configure(text="Procesando…", fg=TEXTO_SUAVE)
+            self.estado.configure(text=T("Procesando…"), fg=TEXTO_SUAVE)
             self.progreso.pack(side="right", padx=px(14), before=self.estado)
             self.progreso.start(12)
         else:
@@ -2957,7 +3020,7 @@ class App(tk.Tk):
                 self.vars[clave].set("")
         if estado == "info":
             self.estado.configure(text=f"\u2139  {msg}", fg=TEXTO_SUAVE)
-            self._aviso("Sin cambios", msg, ok=False)
+            self._aviso(T("Sin cambios"), msg, ok=False)
             return
         ok = estado == "ok"
         if ok:
@@ -2968,16 +3031,16 @@ class App(tk.Tk):
             if self.pref_limpiar and self.archivos:
                 self.archivos = []
                 self._refrescar_lista()
-                extra.append("Se limpió la lista de archivos.")
+                extra.append(T("Se limpió la lista de archivos."))
                 if self.herr_actual.get("camara"):
                     self._borrar_fotos()  # las fotos ya están en el PDF
             if self.pref_abrir:
                 self.abrir_resultado(destino)
-                extra.append("Se abrió el resultado.")
-            self._aviso("¡Listo!", msg + ("\n\n" + " ".join(extra) if extra else ""), ok=True)
+                extra.append(T("Se abrió el resultado."))
+            self._aviso(T("¡Listo!"), msg + ("\n\n" + " ".join(extra) if extra else ""), ok=True)
         else:
             self.estado.configure(text="", fg=TEXTO_SUAVE)
-            messagebox.showerror(APP_NOMBRE, f"No se pudo completar la operación:\n\n{msg}")
+            messagebox.showerror(APP_NOMBRE, T("No se pudo completar la operación:") + "\n\n" + msg)
 
     def _cambiar_pref(self, cual, valor):
         if cual == "abrir":
@@ -3021,10 +3084,10 @@ class App(tk.Tk):
                  wraplength=px(420)).pack()
         botones = tk.Frame(cuerpo, bg=fondo)
         botones.pack(pady=(px(18), 0))
-        aceptar = Boton(botones, "Aceptar", self._cerrar_aviso, bg_padre=fondo)
+        aceptar = Boton(botones, T("Aceptar"), self._cerrar_aviso, bg_padre=fondo)
         aceptar.pack(side="right")
         if ok and self.ultimo_destino:
-            Boton(botones, "Abrir carpeta", lambda: (self._cerrar_aviso(), self.abrir_destino()),
+            Boton(botones, T("Abrir carpeta"), lambda: (self._cerrar_aviso(), self.abrir_destino()),
                   tipo="secundario", bg_padre=fondo).pack(side="right", padx=(0, px(10)))
         marco.place(relx=0.5, rely=0.45, anchor="center")
         marco.lift()

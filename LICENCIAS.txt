@@ -1,4 +1,4 @@
-Ozone PDF 1.1.0 - Licencias de los componentes
+Ozone PDF 1.2.0 - Licencias de los componentes
 ===============================================
 
 Todos los componentes son gratuitos. No hay que pagar nada para usarlos.
